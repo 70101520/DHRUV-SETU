@@ -7,6 +7,7 @@ import nodemailer from 'nodemailer';
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || '0.0.0.0';
+let activeMailConfig = null;
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -48,6 +49,18 @@ const smtpErrorMessage = (error, host = '') => {
   return 'SMTP test failed. Check the server details and credentials.';
 };
 
+const createMailTransport = config => nodemailer.createTransport({
+  host: config.host,
+  port: Number(config.port),
+  secure: config.security === 'SSL/TLS' || Number(config.port) === 465,
+  auth: { user: config.username, pass: config.password },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000
+});
+
+const applyMailVariables = (template, values) => String(template || '').replace(/{{(customer_name|docket_number|location|mobile_number)}}/g, (_, key) => values[key] || '');
+
 const server = createServer((request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
 
@@ -73,15 +86,8 @@ const server = createServer((request, response) => {
       try {
         const normalizedUsername = String(username).trim();
         const normalizedPassword = /gmail/i.test(host) ? String(password).replace(/\s+/g, '') : String(password);
-        const transport = nodemailer.createTransport({
-          host,
-          port: Number(port),
-          secure: security === 'SSL/TLS' || Number(port) === 465,
-          auth: { user: normalizedUsername, pass: normalizedPassword },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 15000
-        });
+        const smtpConfig = { host, port, security, username: normalizedUsername, password: normalizedPassword, sender };
+        const transport = createMailTransport(smtpConfig);
         await transport.verify();
         const result = await transport.sendMail({
           from: sender,
@@ -89,11 +95,49 @@ const server = createServer((request, response) => {
           subject: 'Dhruv-Setu CRM - SMTP test successful',
           text: 'Your SMTP configuration is working correctly. This test was sent from Dhruv-Setu CRM.'
         });
+        activeMailConfig = smtpConfig;
         response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
       } catch (error) {
         response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error, host) }));
+      }
+    }).catch(error => {
+      response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(JSON.stringify({ ok: false, error: error.message }));
+    });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/mail/send-docket' && request.method === 'POST') {
+    readJson(request).then(async payload => {
+      if (!activeMailConfig) {
+        response.writeHead(409, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ ok: false, error: 'SMTP is not active. Open Mail Configuration and send a successful test email first.' }));
+        return;
+      }
+      const recipient = String(payload.email || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+        response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ ok: false, error: 'Customer email address is invalid.' }));
+        return;
+      }
+      const values = {
+        customer_name: String(payload.name || ''),
+        docket_number: String(payload.id || ''),
+        location: String(payload.location || ''),
+        mobile_number: String(payload.number || '')
+      };
+      try {
+        const transport = createMailTransport(activeMailConfig);
+        const subject = applyMailVariables(payload.subject || 'Your docket {{docket_number}}', values).replace(/[\r\n]+/g, ' ').slice(0, 180);
+        const text = applyMailVariables(payload.body || 'Hello {{customer_name}}, your docket {{docket_number}} has been created.', values);
+        const result = await transport.sendMail({ from: activeMailConfig.sender, to: recipient, subject, text });
+        response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
+      } catch (error) {
+        response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error, activeMailConfig.host) }));
       }
     }).catch(error => {
       response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
