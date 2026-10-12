@@ -82,3 +82,13 @@ button:active { transform: scale(.98); }
 .login-workflow { top: 420px; right: 24px; bottom: auto; width: 300px; }
 .workflow-card { background: rgba(255,255,255,.085); }
 @media (max-width: 1450px) { .login-workflow { display: none; } .brand-copy { max-width: 620px; } }
+.quick-docket-modal { width: min(860px,100%); padding: 0; }
+.quick-docket-modal .modal-head { position: sticky; top: 0; z-index: 2; padding: 22px 25px 18px; background: #fff; border-bottom: 1px solid var(--line); }
+.quick-docket-modal .modal-head h3 { margin: 3px 0; }
+.quick-docket-modal .modal-head small { color: var(--green); font-weight: 700; }
+.quick-docket-modal .form-grid { padding: 22px 25px 5px; }
+.modal-kicker { color: var(--green); font-size: 9px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; }
+.modal-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 16px 25px; border-top: 1px solid var(--line); background: #fff; }
+.quick-check { display: flex; align-items: center; gap: 8px; min-height: 43px; }
+.quick-check input { width: auto; }
+@media (max-width: 560px) { .quick-docket-modal .form-grid { grid-template-columns: 1fr; padding: 18px; } .quick-docket-modal .span-2 { grid-column: auto; } .modal-actions { padding: 14px 18px; } }
