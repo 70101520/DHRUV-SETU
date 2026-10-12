@@ -10,3 +10,7 @@
 .note span { font-size: 9px; color: var(--muted); margin-left: 8px; }
 .note p { font-size: 11px; margin: 5px 0; color: #4b5d5a; }
 @media (max-width: 560px) { .detail-grid { grid-template-columns: 1fr; } }
+.icon-btn { position: relative; }
+.icon-btn svg { width: 19px; height: 19px; stroke-width: 1.8; }
+.alert-button i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #e95757; border: 2px solid #fff; right: 7px; top: 7px; }
+.edit-field { padding: 7px 10px; color: var(--green); }
