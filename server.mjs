@@ -71,11 +71,13 @@ const server = createServer((request, response) => {
         return;
       }
       try {
+        const normalizedUsername = String(username).trim();
+        const normalizedPassword = /gmail/i.test(host) ? String(password).replace(/\s+/g, '') : String(password);
         const transport = nodemailer.createTransport({
           host,
           port: Number(port),
           secure: security === 'SSL/TLS' || Number(port) === 465,
-          auth: { user: username, pass: password },
+          auth: { user: normalizedUsername, pass: normalizedPassword },
           connectionTimeout: 10000,
           greetingTimeout: 10000,
           socketTimeout: 15000
