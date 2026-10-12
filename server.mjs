@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import nodemailer from 'nodemailer';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
 const port = Number(process.env.PORT || 8080);
@@ -17,12 +18,62 @@ const mime = {
   '.ico': 'image/x-icon'
 };
 
+const readJson = request => new Promise((resolve, reject) => {
+  let body = '';
+  request.on('data', chunk => {
+    body += chunk;
+    if (body.length > 20000) reject(new Error('Request is too large.'));
+  });
+  request.on('end', () => {
+    try { resolve(JSON.parse(body || '{}')); } catch { reject(new Error('Invalid JSON request.')); }
+  });
+  request.on('error', reject);
+});
+
 const server = createServer((request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
 
   if (requestUrl.pathname === '/health') {
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     response.end(JSON.stringify({ status: 'ok', service: 'dhruv-setu-crm' }));
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/mail/test' && request.method === 'POST') {
+    readJson(request).then(async config => {
+      const { host, port, security, username, password, sender, recipient } = config;
+      if (!host || !port || !username || !password || !sender || !recipient) {
+        response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ ok: false, error: 'Complete all SMTP and test recipient fields.' }));
+        return;
+      }
+      try {
+        const transport = nodemailer.createTransport({
+          host,
+          port: Number(port),
+          secure: security === 'SSL/TLS' || Number(port) === 465,
+          auth: { user: username, pass: password },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000
+        });
+        await transport.verify();
+        const result = await transport.sendMail({
+          from: sender,
+          to: recipient,
+          subject: 'Dhruv-Setu CRM - SMTP test successful',
+          text: 'Your SMTP configuration is working correctly. This test was sent from Dhruv-Setu CRM.'
+        });
+        response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
+      } catch (error) {
+        response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(JSON.stringify({ ok: false, error: error.message || 'SMTP connection failed.' }));
+      }
+    }).catch(error => {
+      response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(JSON.stringify({ ok: false, error: error.message }));
+    });
     return;
   }
 
