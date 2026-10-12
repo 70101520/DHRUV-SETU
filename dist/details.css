@@ -14,3 +14,4 @@
 .icon-btn svg { width: 19px; height: 19px; stroke-width: 1.8; }
 .alert-button i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #e95757; border: 2px solid #fff; right: 7px; top: 7px; }
 .edit-field { padding: 7px 10px; color: var(--green); }
+.report-note { display: inline-flex; align-items: center; padding: 8px 11px; border-radius: 8px; background: #e8f6f2; color: var(--green); font-size: 11px; font-weight: 700; }
