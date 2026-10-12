@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import nodemailer from 'nodemailer';
@@ -8,6 +8,9 @@ const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || '0.0.0.0';
 let activeMailConfig = null;
+const dataDirectory = join(fileURLToPath(new URL('.', import.meta.url)), '.data');
+const mailLogFile = join(dataDirectory, 'mail-delivery.jsonl');
+mkdirSync(dataDirectory, { recursive: true });
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -60,6 +63,11 @@ const createMailTransport = config => nodemailer.createTransport({
 });
 
 const applyMailVariables = (template, values) => String(template || '').replace(/{{(customer_name|docket_number|location|mobile_number)}}/g, (_, key) => values[key] || '');
+const writeMailLog = entry => appendFileSync(mailLogFile, `${JSON.stringify({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), ...entry })}\n`, 'utf8');
+const readMailLogs = () => {
+  if (!existsSync(mailLogFile)) return [];
+  return readFileSync(mailLogFile, 'utf8').split(/\r?\n/).filter(Boolean).slice(-100).reverse().map(line => JSON.parse(line));
+};
 
 const server = createServer((request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
@@ -67,6 +75,12 @@ const server = createServer((request, response) => {
   if (requestUrl.pathname === '/health') {
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     response.end(JSON.stringify({ status: 'ok', service: 'dhruv-setu-crm' }));
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/mail/logs' && request.method === 'GET') {
+    response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    response.end(JSON.stringify({ ok: true, smtpActive: Boolean(activeMailConfig), logs: readMailLogs() }));
     return;
   }
 
@@ -96,9 +110,11 @@ const server = createServer((request, response) => {
           text: 'Your SMTP configuration is working correctly. This test was sent from Dhruv-Setu CRM.'
         });
         activeMailConfig = smtpConfig;
+        writeMailLog({ type: 'smtp-test', status: 'sent', recipient, provider: host, messageId: result.messageId });
         response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
       } catch (error) {
+        writeMailLog({ type: 'smtp-test', status: 'failed', recipient, provider: host, error: smtpErrorMessage(error, host) });
         response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error, host) }));
       }
@@ -112,6 +128,7 @@ const server = createServer((request, response) => {
   if (requestUrl.pathname === '/api/mail/send-docket' && request.method === 'POST') {
     readJson(request).then(async payload => {
       if (!activeMailConfig) {
+        writeMailLog({ type: 'docket-confirmation', status: 'failed', recipient: payload.email || '', docketId: payload.id || '', error: 'SMTP is not active.' });
         response.writeHead(409, { 'content-type': 'application/json; charset=utf-8' });
         response.end(JSON.stringify({ ok: false, error: 'SMTP is not active. Open Mail Configuration and send a successful test email first.' }));
         return;
@@ -133,9 +150,11 @@ const server = createServer((request, response) => {
         const subject = applyMailVariables(payload.subject || 'Your docket {{docket_number}}', values).replace(/[\r\n]+/g, ' ').slice(0, 180);
         const text = applyMailVariables(payload.body || 'Hello {{customer_name}}, your docket {{docket_number}} has been created.', values);
         const result = await transport.sendMail({ from: activeMailConfig.sender, to: recipient, subject, text });
+        writeMailLog({ type: 'docket-confirmation', status: 'sent', recipient, docketId: values.docket_number, provider: activeMailConfig.host, messageId: result.messageId });
         response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
       } catch (error) {
+        writeMailLog({ type: 'docket-confirmation', status: 'failed', recipient, docketId: values.docket_number, provider: activeMailConfig.host, error: smtpErrorMessage(error, activeMailConfig.host) });
         response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error, activeMailConfig.host) }));
       }
