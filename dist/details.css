@@ -96,3 +96,4 @@ button:active { transform: scale(.98); }
 .mail-test-result.success { color: #08745f; background: #e3f5ef; border: 1px solid #b9e2d5; }
 .mail-test-result.error { color: #a34242; background: #fff0f0; border: 1px solid #f0caca; }
 .field-help { color: var(--muted); font-size: 10px; line-height: 1.45; margin-top: 2px; }
+.provider-hint { margin: -5px 0 16px; padding: 10px 12px; border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; background: #f0f7f5; color: #526965; font-size: 10px; line-height: 1.5; }

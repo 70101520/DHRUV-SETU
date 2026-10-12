@@ -30,10 +30,13 @@ const readJson = request => new Promise((resolve, reject) => {
   request.on('error', reject);
 });
 
-const smtpErrorMessage = error => {
+const smtpErrorMessage = (error, host = '') => {
   const text = String(error?.message || 'SMTP connection failed.');
   if (error?.code === 'EAUTH' || /535|BadCredentials|Username and Password not accepted/i.test(text)) {
-    return 'Gmail rejected the login. Use a Google App Password, not your normal Gmail password. Enable 2-Step Verification first, then create an App Password.';
+    if (/gmail/i.test(host)) return 'Gmail rejected the login. Use a Google App Password, not your normal Gmail password. Enable 2-Step Verification first, then create an App Password.';
+    if (/office365|outlook/i.test(host)) return 'Microsoft rejected the login. Confirm SMTP AUTH is enabled for this mailbox and use the password or app password allowed by your organization.';
+    if (/zoho/i.test(host)) return 'Zoho rejected the login. Check the mailbox username, app-specific password and the SMTP host for your Zoho data center.';
+    return 'The mail provider rejected the login. Check the SMTP username, password or app password, and confirm SMTP access is enabled.';
   }
   if (/wrong version number|ssl routines/i.test(text)) {
     return 'Security and port do not match. Use STARTTLS with port 587, or SSL/TLS with port 465.';
@@ -88,7 +91,7 @@ const server = createServer((request, response) => {
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
       } catch (error) {
         response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-        response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error) }));
+        response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error, host) }));
       }
     }).catch(error => {
       response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
