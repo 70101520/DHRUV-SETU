@@ -15,3 +15,25 @@
 .alert-button i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #e95757; border: 2px solid #fff; right: 7px; top: 7px; }
 .edit-field { padding: 7px 10px; color: var(--green); }
 .report-note { display: inline-flex; align-items: center; padding: 8px 11px; border-radius: 8px; background: #e8f6f2; color: var(--green); font-size: 11px; font-weight: 700; }
+
+/* Smooth page and interaction transitions */
+@keyframes pageEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes modalEnter { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.content > * { animation: pageEnter .28s cubic-bezier(.2,.75,.25,1) both; }
+.stats .card:nth-child(2) { animation-delay: 35ms; }
+.stats .card:nth-child(3) { animation-delay: 70ms; }
+.stats .card:nth-child(4) { animation-delay: 105ms; }
+.card, .section-card, .dynamic-item, .nav button, .icon-btn, .outline, .primary { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease, opacity .2s ease; }
+.card:hover, .section-card:hover { box-shadow: 0 12px 32px rgba(7,57,54,.07); }
+.dynamic-item:hover { transform: translateY(-1px); border-color: #c7d8d3; }
+.nav button { position: relative; }
+.nav button.active { transform: translateX(3px); }
+.icon-btn:hover, .outline:hover { border-color: #b8ccc7; background: #f6faf8; }
+.modal-wrap { animation: pageEnter .18s ease both; backdrop-filter: blur(3px); }
+.modal { animation: modalEnter .24s cubic-bezier(.2,.75,.25,1) both; }
+.switch, .switch:after { transition: background-color .22s ease, left .22s ease, transform .18s ease; }
+.switch:active:after { transform: scale(.88); }
+button:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
