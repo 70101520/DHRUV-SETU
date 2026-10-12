@@ -37,3 +37,36 @@ button:active { transform: scale(.98); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Premium white-label login experience */
+.brand-panel { isolation: isolate; }
+.brand-panel::before { animation: orbitFloat 12s ease-in-out infinite alternate; }
+.brand-panel::after { animation: orbitFloat 9s ease-in-out infinite alternate-reverse; }
+.brand-panel .logo-mark { box-shadow: 0 0 0 7px rgba(223,255,115,.08), 0 10px 30px rgba(0,0,0,.16); }
+.brand-copy { margin-top: 42px; }
+.brand-copy h1 { max-width: 650px; }
+.brand-copy h1::after { content: ''; display: block; width: 68px; height: 5px; margin-top: 24px; border-radius: 5px; background: linear-gradient(90deg,var(--lime),transparent); }
+.login-workflow { position: absolute; z-index: 3; width: 330px; right: 42px; bottom: 115px; }
+.workflow-card { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 11px; padding: 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 13px; color: #fff; background: rgba(255,255,255,.1); box-shadow: 0 18px 35px rgba(0,20,19,.13); backdrop-filter: blur(12px); animation: cardFloat 5s ease-in-out infinite; }
+.workflow-card.card-two { margin: 10px 0 10px 32px; animation-delay: -1.8s; }
+.workflow-card.card-three { margin-left: 8px; animation-delay: -3.2s; }
+.workflow-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--lime); color: var(--dark); font-size: 10px; font-weight: 800; }
+.workflow-card small { display: block; color: #92bbb5; font-size: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.workflow-card strong { display: block; margin-top: 2px; font-size: 10px; }
+.workflow-card i { padding: 4px 7px; border-radius: 12px; background: rgba(223,255,115,.13); color: var(--lime); font-size: 8px; font-style: normal; font-weight: 700; }
+.workflow-line { position: absolute; z-index: -1; left: 28px; top: 35px; width: 2px; height: 105px; background: rgba(223,255,115,.2); }
+.workflow-line b { display: block; width: 2px; height: 32px; background: var(--lime); animation: workflowProgress 2.8s ease-in-out infinite; }
+.login-card { padding: 34px; border: 1px solid rgba(7,57,54,.07); border-radius: 22px; background: rgba(255,255,255,.75); box-shadow: 0 24px 70px rgba(7,57,54,.08); backdrop-filter: blur(16px); }
+.login-side { position: relative; overflow: hidden; background: radial-gradient(circle at 90% 8%,rgba(14,164,134,.1),transparent 28%),linear-gradient(145deg,#fbfdfc,#eff6f3); }
+.secure-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; margin-bottom: 16px; border-radius: 20px; background: #e6f5f0; color: var(--green); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; }
+.secure-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--green2); box-shadow: 0 0 0 4px rgba(14,164,134,.12); animation: livePulse 1.8s ease-in-out infinite; }
+.login-submit { display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 11px 24px rgba(8,127,107,.2); }
+.login-submit b { transition: transform .2s ease; }
+.login-submit:hover b { transform: translateX(4px); }
+.login-footnote { margin: 18px 0 0; text-align: center; color: #86938f; font-size: 9px; }
+@keyframes cardFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes orbitFloat { from { transform: translate(0,0) scale(1); } to { transform: translate(-20px,18px) scale(1.04); } }
+@keyframes workflowProgress { 0% { transform: translateY(0); opacity: .2; } 50% { opacity: 1; } 100% { transform: translateY(73px); opacity: .2; } }
+@keyframes livePulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
+@media (max-width: 1250px) { .login-workflow { display: none; } }
+@media (max-width: 900px) { .login-card { padding: 26px; } }
