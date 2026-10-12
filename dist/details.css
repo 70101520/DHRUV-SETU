@@ -95,3 +95,4 @@ button:active { transform: scale(.98); }
 .mail-test-result { margin-top: 12px; padding: 11px 13px; border-radius: 9px; font-size: 11px; font-weight: 700; }
 .mail-test-result.success { color: #08745f; background: #e3f5ef; border: 1px solid #b9e2d5; }
 .mail-test-result.error { color: #a34242; background: #fff0f0; border: 1px solid #f0caca; }
+.field-help { color: var(--muted); font-size: 10px; line-height: 1.45; margin-top: 2px; }

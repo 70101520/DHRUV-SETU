@@ -30,6 +30,21 @@ const readJson = request => new Promise((resolve, reject) => {
   request.on('error', reject);
 });
 
+const smtpErrorMessage = error => {
+  const text = String(error?.message || 'SMTP connection failed.');
+  if (error?.code === 'EAUTH' || /535|BadCredentials|Username and Password not accepted/i.test(text)) {
+    return 'Gmail rejected the login. Use a Google App Password, not your normal Gmail password. Enable 2-Step Verification first, then create an App Password.';
+  }
+  if (/wrong version number|ssl routines/i.test(text)) {
+    return 'Security and port do not match. Use STARTTLS with port 587, or SSL/TLS with port 465.';
+  }
+  if (error?.code === 'ECONNECTION' || error?.code === 'ETIMEDOUT') {
+    return 'Could not connect to the SMTP server. Check the host, port, firewall and internet connection.';
+  }
+  if (/certificate/i.test(text)) return 'SMTP certificate verification failed. Check the server hostname and security mode.';
+  return 'SMTP test failed. Check the server details and credentials.';
+};
+
 const server = createServer((request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
 
@@ -45,6 +60,11 @@ const server = createServer((request, response) => {
       if (!host || !port || !username || !password || !sender || !recipient) {
         response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
         response.end(JSON.stringify({ ok: false, error: 'Complete all SMTP and test recipient fields.' }));
+        return;
+      }
+      if ((Number(port) === 587 && security !== 'STARTTLS') || (Number(port) === 465 && security !== 'SSL/TLS')) {
+        response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ ok: false, error: 'Use STARTTLS with port 587, or SSL/TLS with port 465.' }));
         return;
       }
       try {
@@ -68,7 +88,7 @@ const server = createServer((request, response) => {
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
       } catch (error) {
         response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-        response.end(JSON.stringify({ ok: false, error: error.message || 'SMTP connection failed.' }));
+        response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error) }));
       }
     }).catch(error => {
       response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
