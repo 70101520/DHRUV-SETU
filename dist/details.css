@@ -105,3 +105,5 @@ button:active { transform: scale(.98); }
 .email-failed { background: #fff0f0; color: #b04646; }
 .email-sending { background: #fff2d7; color: #956500; }
 .email-not.sent { background: #edf0ef; color: #66716f; }
+.smtp-actions { display: flex; justify-content: flex-end; margin-top: 5px; }
+.settings-divider { border: 0; border-top: 1px solid var(--line); margin: 21px 0; }

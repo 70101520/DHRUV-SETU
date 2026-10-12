@@ -141,6 +141,48 @@ const server = createServer((request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/mail/config' && request.method === 'POST') {
+    readJson(request).then(async config => {
+      const { host, port, security, username, sender } = config;
+      const suppliedPassword = String(config.password || '').trim();
+      const password = suppliedPassword || activeMailConfig?.password || '';
+      if (!host || !port || !username || !sender || !password) {
+        response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ ok: false, error: 'Complete the SMTP fields. A password is required for the first save.' }));
+        return;
+      }
+      if ((Number(port) === 587 && security !== 'STARTTLS') || (Number(port) === 465 && security !== 'SSL/TLS')) {
+        response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ ok: false, error: 'Use STARTTLS with port 587, or SSL/TLS with port 465.' }));
+        return;
+      }
+      const smtpConfig = {
+        host: String(host).trim(), port, security,
+        username: String(username).trim(),
+        password: /gmail/i.test(host) ? password.replace(/\s+/g, '') : password,
+        sender: String(sender).trim()
+      };
+      try {
+        const transport = createMailTransport(smtpConfig);
+        await transport.verify();
+        activeMailConfig = smtpConfig;
+        saveMailConfig(smtpConfig);
+        writeMailLog({ type: 'smtp-config', status: 'sent', recipient: smtpConfig.sender, provider: smtpConfig.host, messageId: 'Configuration verified and saved' });
+        response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(JSON.stringify({ ok: true }));
+      } catch (error) {
+        const message = smtpErrorMessage(error, host);
+        writeMailLog({ type: 'smtp-config', status: 'failed', recipient: sender, provider: host, error: message });
+        response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(JSON.stringify({ ok: false, error: message }));
+      }
+    }).catch(error => {
+      response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(JSON.stringify({ ok: false, error: error.message }));
+    });
+    return;
+  }
+
   if (requestUrl.pathname === '/api/mail/test' && request.method === 'POST') {
     readJson(request).then(async config => {
       const { host, port, security, username, password, sender, recipient } = config;
