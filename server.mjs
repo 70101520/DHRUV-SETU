@@ -36,6 +36,7 @@ const server = createServer((request, response) => {
 
   response.writeHead(200, {
     'content-type': mime[extname(file).toLowerCase()] || 'application/octet-stream',
+    'cache-control': 'no-store, max-age=0',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'SAMEORIGIN',
     'referrer-policy': 'strict-origin-when-cross-origin'
