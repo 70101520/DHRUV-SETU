@@ -10,6 +10,7 @@ const host = process.env.HOST || '0.0.0.0';
 let activeMailConfig = null;
 const dataDirectory = join(fileURLToPath(new URL('.', import.meta.url)), '.data');
 const mailLogFile = join(dataDirectory, 'mail-delivery.jsonl');
+const auditLogFile = join(dataDirectory, 'audit.jsonl');
 mkdirSync(dataDirectory, { recursive: true });
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -68,6 +69,11 @@ const readMailLogs = () => {
   if (!existsSync(mailLogFile)) return [];
   return readFileSync(mailLogFile, 'utf8').split(/\r?\n/).filter(Boolean).slice(-100).reverse().map(line => JSON.parse(line));
 };
+const writeAuditLog = entry => appendFileSync(auditLogFile, `${JSON.stringify({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), ...entry })}\n`, 'utf8');
+const readAuditLogs = () => {
+  if (!existsSync(auditLogFile)) return [];
+  return readFileSync(auditLogFile, 'utf8').split(/\r?\n/).filter(Boolean).slice(-500).reverse().map(line => JSON.parse(line));
+};
 
 const server = createServer((request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
@@ -81,6 +87,31 @@ const server = createServer((request, response) => {
   if (requestUrl.pathname === '/api/mail/logs' && request.method === 'GET') {
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     response.end(JSON.stringify({ ok: true, smtpActive: Boolean(activeMailConfig), logs: readMailLogs() }));
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/audit' && request.method === 'GET') {
+    response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    response.end(JSON.stringify({ ok: true, logs: readAuditLogs() }));
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/audit' && request.method === 'POST') {
+    readJson(request).then(entry => {
+      writeAuditLog({
+        action: String(entry.action || 'Unknown action').slice(0, 100),
+        status: ['success', 'failed', 'info'].includes(entry.status) ? entry.status : 'info',
+        user: String(entry.user || 'System').slice(0, 100),
+        role: String(entry.role || 'System').slice(0, 40),
+        docketId: String(entry.docketId || '').slice(0, 80),
+        details: String(entry.details || '').slice(0, 500)
+      });
+      response.writeHead(201, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify({ ok: true }));
+    }).catch(error => {
+      response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(JSON.stringify({ ok: false, error: error.message }));
+    });
     return;
   }
 
