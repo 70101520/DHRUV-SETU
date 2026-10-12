@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
-import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 import nodemailer from 'nodemailer';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
@@ -11,7 +12,15 @@ let activeMailConfig = null;
 const dataDirectory = join(fileURLToPath(new URL('.', import.meta.url)), '.data');
 const mailLogFile = join(dataDirectory, 'mail-delivery.jsonl');
 const auditLogFile = join(dataDirectory, 'audit.jsonl');
+const mailKeyFile = join(dataDirectory, 'mail-config.key');
+const mailConfigFile = join(dataDirectory, 'mail-config.enc');
 mkdirSync(dataDirectory, { recursive: true });
+const mailEncryptionKey = process.env.MAIL_CONFIG_KEY
+  ? Buffer.from(process.env.MAIL_CONFIG_KEY, 'base64')
+  : existsSync(mailKeyFile)
+    ? Buffer.from(readFileSync(mailKeyFile, 'utf8'), 'base64')
+    : randomBytes(32);
+if (!process.env.MAIL_CONFIG_KEY && !existsSync(mailKeyFile)) writeFileSync(mailKeyFile, mailEncryptionKey.toString('base64'), { encoding: 'utf8', mode: 0o600 });
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -63,13 +72,30 @@ const createMailTransport = config => nodemailer.createTransport({
   socketTimeout: 15000
 });
 
+const saveMailConfig = config => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', mailEncryptionKey, iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(config), 'utf8'), cipher.final()]);
+  writeFileSync(mailConfigFile, JSON.stringify({ iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: encrypted.toString('base64') }), { encoding: 'utf8', mode: 0o600 });
+};
+const loadMailConfig = () => {
+  if (!existsSync(mailConfigFile)) return null;
+  try {
+    const saved = JSON.parse(readFileSync(mailConfigFile, 'utf8'));
+    const decipher = createDecipheriv('aes-256-gcm', mailEncryptionKey, Buffer.from(saved.iv, 'base64'));
+    decipher.setAuthTag(Buffer.from(saved.tag, 'base64'));
+    return JSON.parse(Buffer.concat([decipher.update(Buffer.from(saved.data, 'base64')), decipher.final()]).toString('utf8'));
+  } catch { return null; }
+};
+activeMailConfig = loadMailConfig();
+
 const applyMailVariables = (template, values) => String(template || '').replace(/{{(customer_name|docket_number|location|mobile_number)}}/g, (_, key) => values[key] || '');
-const writeMailLog = entry => appendFileSync(mailLogFile, `${JSON.stringify({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), ...entry })}\n`, 'utf8');
+const writeMailLog = entry => appendFileSync(mailLogFile, `${JSON.stringify({ id: randomUUID(), timestamp: new Date().toISOString(), ...entry })}\n`, 'utf8');
 const readMailLogs = () => {
   if (!existsSync(mailLogFile)) return [];
   return readFileSync(mailLogFile, 'utf8').split(/\r?\n/).filter(Boolean).slice(-100).reverse().map(line => JSON.parse(line));
 };
-const writeAuditLog = entry => appendFileSync(auditLogFile, `${JSON.stringify({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), ...entry })}\n`, 'utf8');
+const writeAuditLog = entry => appendFileSync(auditLogFile, `${JSON.stringify({ id: randomUUID(), timestamp: new Date().toISOString(), ...entry })}\n`, 'utf8');
 const readAuditLogs = () => {
   if (!existsSync(auditLogFile)) return [];
   return readFileSync(auditLogFile, 'utf8').split(/\r?\n/).filter(Boolean).slice(-500).reverse().map(line => JSON.parse(line));
@@ -141,6 +167,7 @@ const server = createServer((request, response) => {
           text: 'Your SMTP configuration is working correctly. This test was sent from Dhruv-Setu CRM.'
         });
         activeMailConfig = smtpConfig;
+        saveMailConfig(smtpConfig);
         writeMailLog({ type: 'smtp-test', status: 'sent', recipient, provider: host, messageId: result.messageId });
         response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
