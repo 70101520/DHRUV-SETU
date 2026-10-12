@@ -1,0 +1,15 @@
+{
+  "name": "dhruv-setu-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portable tourism CRM for Windows, Linux and Docker",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "check": "node --check server.mjs && node --check dist/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
