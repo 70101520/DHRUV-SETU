@@ -1,0 +1,12 @@
+.modal { max-height: 92vh; overflow: auto; }
+.docket-modal { width: min(720px, 100%); }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.detail-grid > div { background: #f6f9f8; border: 1px solid var(--line); padding: 12px; border-radius: 10px; }
+.detail-grid span { display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 4px; }
+.detail-grid strong { font-size: 12px; }
+.notes-list { border-top: 1px solid var(--line); margin: 7px 0 18px; padding-top: 12px; max-height: 170px; overflow: auto; }
+.note { border-left: 3px solid var(--green); padding: 4px 10px; margin-bottom: 12px; }
+.note strong { font-size: 11px; }
+.note span { font-size: 9px; color: var(--muted); margin-left: 8px; }
+.note p { font-size: 11px; margin: 5px 0; color: #4b5d5a; }
+@media (max-width: 560px) { .detail-grid { grid-template-columns: 1fr; } }

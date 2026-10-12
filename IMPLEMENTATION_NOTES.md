@@ -18,6 +18,10 @@ All CRM screens, field labels, validation messages, reports, and customer emails
 - SMTP settings and editable customer email template
 - Template variables for customer name, docket number, destination, and mobile number
 - Profile and logout actions
+- Admin user management with enable/disable controls
+- Docket detail view with status updates and internal notes
+- Click-to-call action placeholder linked to dialer settings
+- Dialer provider, API URL, API key, webhook, and call-workflow configuration
 - Responsive desktop and mobile layouts
 - Browser persistence for the interactive prototype
 
