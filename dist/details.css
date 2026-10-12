@@ -70,3 +70,15 @@ button:active { transform: scale(.98); }
 @keyframes livePulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
 @media (max-width: 1250px) { .login-workflow { display: none; } }
 @media (max-width: 900px) { .login-card { padding: 26px; } }
+
+/* Refined professional hero composition */
+.brand-copy { margin-top: 30px; max-width: 510px; }
+.brand-copy h1 { max-width: 510px; font-size: clamp(46px,4.25vw,64px); line-height: 1.04; letter-spacing: -2.5px; margin: 20px 0; text-wrap: balance; }
+.brand-copy h1::after { width: 54px; height: 4px; margin-top: 20px; }
+.brand-copy p { max-width: 470px; font-size: 15px; line-height: 1.65; }
+.capability-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 19px; }
+.capability-row span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.13); border-radius: 20px; background: rgba(255,255,255,.06); color: #c6ded9; font-size: 9px; font-weight: 700; letter-spacing: .15px; }
+.capability-row span::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--lime); }
+.login-workflow { top: 420px; right: 38px; bottom: auto; width: 315px; }
+.workflow-card { background: rgba(255,255,255,.085); }
+@media (max-width: 1450px) { .login-workflow { display: none; } .brand-copy { max-width: 620px; } }
