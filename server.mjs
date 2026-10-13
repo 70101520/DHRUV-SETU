@@ -4,7 +4,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 import nodemailer from 'nodemailer';
-import { closeEnterpriseDatabase, databaseStatus, handleEnterprise, initializeEnterpriseDatabase } from './enterprise.mjs';
+import { closeEnterpriseDatabase, databaseStatus, handleEnterprise, initializeEnterpriseDatabase, updateDocketEmailStatus } from './enterprise.mjs';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
 const port = Number(process.env.PORT || 8080);
@@ -238,6 +238,7 @@ const server = createServer(async (request, response) => {
   if (requestUrl.pathname === '/api/mail/send-docket' && request.method === 'POST') {
     readJson(request).then(async payload => {
       if (!activeMailConfig) {
+        await updateDocketEmailStatus(request.crmUser?.organization_id, payload.id, 'Failed', 'SMTP is not active.');
         writeMailLog({ type: 'docket-confirmation', status: 'failed', recipient: payload.email || '', docketId: payload.id || '', error: 'SMTP is not active.' });
         response.writeHead(409, { 'content-type': 'application/json; charset=utf-8' });
         response.end(JSON.stringify({ ok: false, error: 'SMTP is not active. Open Mail Configuration and send a successful test email first.' }));
@@ -260,10 +261,12 @@ const server = createServer(async (request, response) => {
         const subject = applyMailVariables(payload.subject || 'Your docket {{docket_number}}', values).replace(/[\r\n]+/g, ' ').slice(0, 180);
         const text = applyMailVariables(payload.body || 'Hello {{customer_name}}, your docket {{docket_number}} has been created.', values);
         const result = await transport.sendMail({ from: activeMailConfig.sender, to: recipient, subject, text });
+        await updateDocketEmailStatus(request.crmUser?.organization_id, values.docket_number, 'Sent');
         writeMailLog({ type: 'docket-confirmation', status: 'sent', recipient, docketId: values.docket_number, provider: activeMailConfig.host, messageId: result.messageId });
         response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: true, messageId: result.messageId }));
       } catch (error) {
+        await updateDocketEmailStatus(request.crmUser?.organization_id, values.docket_number, 'Failed', smtpErrorMessage(error, activeMailConfig.host));
         writeMailLog({ type: 'docket-confirmation', status: 'failed', recipient, docketId: values.docket_number, provider: activeMailConfig.host, error: smtpErrorMessage(error, activeMailConfig.host) });
         response.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         response.end(JSON.stringify({ ok: false, error: smtpErrorMessage(error, activeMailConfig.host) }));

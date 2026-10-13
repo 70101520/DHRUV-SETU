@@ -168,6 +168,11 @@ const api = async (path, options = {}) => {
 const loadWorkspace = async () => {
   let payload = await api("/api/bootstrap");
   state.dockets = payload.dockets || [];
+  state.fields = payload.fields || state.fields;
+  state.team = payload.team || state.team;
+  state.brand = payload.brand || state.brand;
+  state.reportsAllowed = payload.reportsAllowed !== false;
+  if (payload.mailTemplate) state.mail = { ...state.mail, ...payload.mailTemplate };
   save();
 };
 function loginView() {
@@ -599,11 +604,13 @@ function bindApp() {
       toast(`Report downloaded with ${custom.length} custom fields`);
     };
   if ($("#reportPermission"))
-    $("#reportPermission").onclick = () => {
-      state.reportsAllowed = !state.reportsAllowed;
-      save();
-      render();
-      toast("Support permission updated");
+    $("#reportPermission").onclick = async () => {
+      try {
+        let next = !state.reportsAllowed;
+        await api("/api/settings", { method: "PUT", body: JSON.stringify({ reportsAllowed: next }) });
+        state.reportsAllowed = next;
+        save(); render(); toast("Support permission updated");
+      } catch (error) { toast(error.message); }
     };
   if ($("#mailLogRows")) {
     loadMailLogs();
@@ -746,28 +753,28 @@ function bindApp() {
     };
   }
   if ($("#templateForm"))
-    $("#templateForm").onsubmit = (event) => {
+    $("#templateForm").onsubmit = async (event) => {
       event.preventDefault();
-      state.mail = {
-        ...state.mail,
-        ...Object.fromEntries(new FormData(event.target)),
-      };
-      save();
+      let mailTemplate = Object.fromEntries(new FormData(event.target));
       let result = $("#templateSaveResult");
-      result.textContent = "Email template saved in this CRM.";
-      result.className = "mail-test-result success";
-      recordAudit("Email template saved", "Docket confirmation template");
-      toast("Email template saved");
+      try {
+        await api("/api/settings", { method: "PUT", body: JSON.stringify({ mailTemplate }) });
+        state.mail = { ...state.mail, ...mailTemplate }; save();
+        result.textContent = "Email template saved for this organization.";
+        result.className = "mail-test-result success";
+        toast("Email template saved");
+      } catch (error) { result.textContent = error.message; result.className = "mail-test-result error"; }
     };
   if ($("#addUser")) $("#addUser").onclick = showUserModal;
   $$(".toggle-user").forEach(
     (b) =>
-      (b.onclick = () => {
+      (b.onclick = async () => {
         let u = state.team.find((x) => x.id == b.dataset.user);
-        u.status = u.status === "Active" ? "Inactive" : "Active";
-        save();
-        render();
-        toast("User access updated");
+        try {
+          let active = u.status !== "Active";
+          await api(`/api/users/${u.id}`, { method: "PATCH", body: JSON.stringify({ active }) });
+          u.status = active ? "Active" : "Inactive"; save(); render(); toast("User access updated");
+        } catch (error) { toast(error.message); }
       }),
   );
   if ($("#dialerForm"))
@@ -797,16 +804,13 @@ function bindApp() {
           : "Enter an API Base URL first",
       );
   if ($("#organizationForm"))
-    $("#organizationForm").onsubmit = (e) => {
+    $("#organizationForm").onsubmit = async (e) => {
       e.preventDefault();
-      state.brand = {
-        ...state.brand,
-        ...Object.fromEntries(new FormData(e.target)),
-      };
-      document.title = state.brand.name + " CRM";
-      save();
-      toast("Organization branding updated");
-      render();
+      let brand = { ...state.brand, ...Object.fromEntries(new FormData(e.target)) };
+      try {
+        await api("/api/settings", { method: "PUT", body: JSON.stringify({ brand }) });
+        state.brand = brand; document.title = state.brand.name + " CRM"; save(); toast("Organization branding updated"); render();
+      } catch (error) { toast(error.message); }
     };
   if ($("#profileForm"))
     $("#profileForm").onsubmit = (e) => {
@@ -929,21 +933,16 @@ function showDocket(id) {
         ? "Call request queued"
         : "Click-to-call is disabled",
     );
-  $("#docketUpdate").onsubmit = (e) => {
+  $("#docketUpdate").onsubmit = async (e) => {
     e.preventDefault();
     let f = new FormData(e.target);
-    d.status = f.get("status");
     let note = f.get("note").trim();
-    if (note)
-      d.notes.push({
-        text: note,
-        author: session.name,
-        date: new Date().toLocaleString("en-IN"),
-      });
-    save();
-    $(".modal-wrap").remove();
-    toast("Docket updated");
-    render();
+    try {
+      await api(`/api/dockets/${encodeURIComponent(d.id)}`, { method: "PATCH", body: JSON.stringify({ status: f.get("status"), note }) });
+      d.status = f.get("status");
+      if (note) d.notes.push({ text: note, author: session.name, date: new Date().toLocaleString("en-IN") });
+      save(); $(".modal-wrap").remove(); toast("Docket updated"); render();
+    } catch (error) { toast(error.message); }
   };
 }
 function showUserModal() {
@@ -952,24 +951,17 @@ function showUserModal() {
     `<div class="modal-wrap"><form class="modal" id="userForm"><div class="modal-head"><h3>Add team member</h3><button type="button" class="close">x</button></div><div class="field"><label>Full Name</label><input name="name" required></div><div class="field"><label>Email / Login ID</label><input name="email" type="email" required></div><div class="field"><label>Role</label><select name="role"><option>User</option><option>Support</option><option>Admin</option></select></div><div class="field"><label>Temporary Password</label><input name="password" type="password" required minlength="6"></div><button class="primary full">Create User</button></form></div>`,
   );
   $(".close").onclick = () => $(".modal-wrap").remove();
-  $("#userForm").onsubmit = (e) => {
+  $("#userForm").onsubmit = async (e) => {
     e.preventDefault();
     let f = Object.fromEntries(new FormData(e.target));
-    state.team.push({
-      id: Date.now(),
-      name: f.name,
-      email: f.email,
-      role: f.role,
-      status: "Active",
-    });
-    save();
-    $(".modal-wrap").remove();
-    toast("Team member created");
-    render();
+    try {
+      let payload = await api("/api/users", { method: "POST", body: JSON.stringify(f) });
+      state.team.push(payload.user); save(); $(".modal-wrap").remove(); toast("Team member created"); render();
+    } catch (error) { toast(error.message); }
   };
 }
 function showFieldModal(editId) {
-  let existing = state.fields.find((f) => f.id === editId);
+  let existing = state.fields.find((f) => String(f.id) === String(editId));
   document.body.insertAdjacentHTML(
     "beforeend",
     `<div class="modal-wrap"><form class="modal" id="fieldForm"><div class="modal-head"><h3>${existing ? "Edit" : "Add"} custom field</h3><button type="button" class="close">x</button></div><div class="field"><label>Field Label</label><input name="label" required placeholder="e.g. Preferred city" value="${existing?.label || ""}"></div><div class="field"><label>Field Type</label><select name="type" id="fieldType"><option ${existing?.type === "Dropdown" ? "selected" : ""}>Dropdown</option><option ${existing?.type === "Checkbox" ? "selected" : ""}>Checkbox</option></select></div><div class="field ${existing?.type === "Checkbox" ? "hidden" : ""}" id="optionsField"><label>Options (comma separated)</label><input name="options" placeholder="Goa, Manali, Jaipur" value="${existing?.options || ""}"></div><button class="primary full">${existing ? "Save changes" : "Add field"}</button></form></div>`,
@@ -980,20 +972,15 @@ function showFieldModal(editId) {
       "hidden",
       e.target.value === "Checkbox",
     );
-  $("#fieldForm").onsubmit = (e) => {
+  $("#fieldForm").onsubmit = async (e) => {
     e.preventDefault();
     let values = Object.fromEntries(new FormData(e.target));
     if (values.type === "Checkbox") values.options = "";
-    if (existing) Object.assign(existing, values);
-    else state.fields.push({ id: Date.now(), ...values, enabled: true });
-    save();
-    recordAudit(
-      existing ? "Custom field updated" : "Custom field created",
-      values.label,
-    );
-    $(".modal-wrap").remove();
-    toast(existing ? "Custom field updated" : "Custom field added");
-    render();
+    try {
+      let payload = await api(existing ? `/api/custom-fields/${existing.id}` : "/api/custom-fields", { method: existing ? "PUT" : "POST", body: JSON.stringify(values) });
+      if (existing) Object.assign(existing, payload.field); else state.fields.push(payload.field);
+      save(); $(".modal-wrap").remove(); toast(existing ? "Custom field updated" : "Custom field added"); render();
+    } catch (error) { toast(error.message); }
   };
 }
 
@@ -1018,20 +1005,18 @@ document.addEventListener("click", (event) => {
       (item) => String(item.id) === toggle.dataset.toggleField,
     );
     if (!field) return;
-    field.enabled = !field.enabled;
-    save();
-    render();
-    toast(field.enabled ? "Field enabled" : "Field disabled");
+    let enabled = !field.enabled;
+    api(`/api/custom-fields/${field.id}`, { method: "PUT", body: JSON.stringify({ enabled }) })
+      .then((payload) => { Object.assign(field, payload.field); save(); render(); toast(field.enabled ? "Field enabled" : "Field disabled"); })
+      .catch((error) => toast(error.message));
     return;
   }
   if (remove) {
     event.preventDefault();
-    state.fields = state.fields.filter(
-      (item) => String(item.id) !== remove.dataset.deleteField,
-    );
-    save();
-    render();
-    toast("Custom field deleted");
+    if (!confirm("Delete this custom field? Existing docket values will remain archived.")) return;
+    api(`/api/custom-fields/${remove.dataset.deleteField}`, { method: "DELETE" })
+      .then(() => { state.fields = state.fields.filter((item) => String(item.id) !== remove.dataset.deleteField); save(); render(); toast("Custom field deleted"); })
+      .catch((error) => toast(error.message));
   }
 });
 async function boot() {
