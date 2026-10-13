@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dhruv_setu
+      POSTGRES_USER: dhruv_setu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-before-production}
+    volumes:
+      - dhruv_setu_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dhruv_setu -d dhruv_setu"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   dhruv-setu:
     build: .
     container_name: dhruv-setu-crm
@@ -9,9 +24,19 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 8080
+      DATABASE_URL: postgresql://dhruv_setu:${POSTGRES_PASSWORD:-change-this-before-production}@postgres:5432/dhruv_setu
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+      SEED_SUPPORT_PASSWORD: ${SEED_SUPPORT_PASSWORD:-support123}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-user123}
       # Optional: set MAIL_CONFIG_KEY to a stable base64-encoded 32-byte key in production.
     volumes:
       - dhruv_setu_data:/app/.data
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   dhruv_setu_data:
+  dhruv_setu_postgres:

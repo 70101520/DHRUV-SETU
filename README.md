@@ -58,3 +58,14 @@ docker run -d --name dhruv-setu-crm --restart unless-stopped -p 8080:8080 dhruv-
 - Admin: `admin` / `admin123`
 
 Data currently persists in browser `localStorage`. Production authentication, shared database storage, SMTP delivery and dialer integration will be connected through a secure backend API in the next server-side phase.
+# Enterprise database mode
+
+Dhruv-Setu now uses PostgreSQL for server-side users, sessions and shared dockets. Browser passwords are no longer trusted or stored in the frontend.
+
+For a new Docker deployment, copy `.env.example` to `.env`, replace every sample password, and run:
+
+```bash
+docker compose up --build -d
+```
+
+For direct Windows or Linux hosting, install PostgreSQL, create a database, set `DATABASE_URL`, then run `npm start`. The schema and initial role accounts are created automatically. Set `COOKIE_SECURE=true` only when the CRM is served through HTTPS.

@@ -1,61 +1,1045 @@
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const icon=n=>({dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>',list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',report:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V9M10 19V5M16 19v-7M22 19V2"/></svg>',settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a2 2 0 0 0 .4 2.2l.1.1-2.6 2.6-.1-.1a2 2 0 0 0-2.2-.4 2 2 0 0 0-1.2 1.8V21h-3.6v-.2A2 2 0 0 0 9 19a2 2 0 0 0-2.2.4l-.1.1-2.6-2.6.1-.1A2 2 0 0 0 4.6 15a2 2 0 0 0-1.8-1.2H3v-3.6h.2A2 2 0 0 0 5 9a2 2 0 0 0-.4-2.2l-.1-.1 2.6-2.6.1.1A2 2 0 0 0 9 4.6a2 2 0 0 0 1.2-1.8V3h3.6v.2A2 2 0 0 0 15 5a2 2 0 0 0 2.2-.4l.1-.1 2.6 2.6-.1.1A2 2 0 0 0 19.4 9a2 2 0 0 0 1.8 1.2h.2v3.6h-.2A2 2 0 0 0 19.4 15z"/></svg>',user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'})[n];
-const seed=[{id:'DS-261012-1042',number:'9876543210',name:'Aarav Mehta',email:'aarav@email.com',location:'Goa',query:'Family holiday package',remark:'4 nights, beach property',status:'New',created:'2026-10-12',owner:'User'},{id:'DS-261011-7831',number:'9988776655',name:'Neha Shah',email:'neha@email.com',location:'Manali',query:'Honeymoon booking',remark:'December first week',status:'In Progress',created:'2026-10-11',owner:'User'},{id:'DS-261009-4610',number:'9123456780',name:'Rohan Das',email:'rohan@email.com',location:'Jaipur',query:'Corporate group tour',remark:'18 persons',status:'Closed',created:'2026-10-09',owner:'Support'}];
-let state=JSON.parse(localStorage.getItem('dhruvSetuState')||'null')||{dockets:seed,fields:[{id:1,label:'Preferred Hotel Category',type:'Dropdown',options:'3 Star, 4 Star, 5 Star',enabled:true},{id:2,label:'Need Airport Pickup?',type:'Checkbox',options:'',enabled:true}],reportsAllowed:true,mail:{host:'smtp.gmail.com',port:'587',sender:'bookings@dhruvsetu.in',subject:'Your booking request {{docket_number}}',body:'Hello {{customer_name}},\n\nYour docket {{docket_number}} has been created for {{location}}. Our travel team will contact you shortly.\n\nThank you,\nDhruv-Setu Team'}};
-state.brand ||= {name:'Dhruv-Setu',label:'Customer Operations CRM',headline:'Every customer, beautifully managed.',description:'From first enquiry to final resolution - bring your customers, service requests and team together in one seamless workspace.'};
-if(state.brand.headline==='Every customer, beautifully managed.')state.brand.headline='Customer operations, simplified.';
-if(state.brand.description==='From first enquiry to final resolution - bring your customers, service requests and team together in one seamless workspace.')state.brand.description='Capture enquiries, coordinate teams and resolve every request from one secure workspace.';
-state.team ||= [{id:1,name:'Amit Kumar',email:'user@dhruvsetu.in',role:'User',status:'Active'},{id:2,name:'Priya Support',email:'support@dhruvsetu.in',role:'Support',status:'Active'},{id:3,name:'Balram Admin',email:'admin@dhruvsetu.in',role:'Admin',status:'Active'}];
-state.mail.provider ||= state.mail.host.includes('gmail')?'Gmail':state.mail.host.includes('office365')?'Microsoft 365 / Outlook':state.mail.host.includes('zoho')?'Zoho Mail':'Custom SMTP';
-state.dialer ||= {provider:'Custom API',baseUrl:'',apiKey:'',webhookUrl:'/api/dialer/webhook',clickToCall:true,autoLog:true};
-state.dockets.forEach(d=>d.notes ||= []);
-let session=JSON.parse(sessionStorage.getItem('dsSession')||'null'),page='dashboard';
-const save=()=>localStorage.setItem('dhruvSetuState',JSON.stringify(state));
-const recordAudit=(action,details,status='success',docketId='')=>fetch('/api/audit',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,details,status,docketId,user:session?.name||'Guest',role:session?.role||'Public'})}).catch(()=>{});
-const toast=m=>{const e=$('#toast');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)};
-const users={user:{pass:'user123',name:'Amit Kumar',email:'user@dhruvsetu.in'},support:{pass:'support123',name:'Priya Support',email:'support@dhruvsetu.in'},admin:{pass:'admin123',name:'Balram Admin',email:'admin@dhruvsetu.in'}};
-function loginView(){return `<section class="login-shell"><div class="brand-panel"><div class="logo"><span class="logo-mark">DS</span>${state.brand.name}</div><div class="brand-copy"><span class="eyebrow">${state.brand.label}</span><h1>${state.brand.headline}</h1><p>${state.brand.description}</p><div class="capability-row"><span>Capture enquiries</span><span>Assign ownership</span><span>Track resolution</span></div></div><div class="login-workflow" aria-hidden="true"><div class="workflow-card card-one"><span class="workflow-icon">01</span><div><small>New request</small><strong>Customer enquiry received</strong></div><i>New</i></div><div class="workflow-line"><b></b></div><div class="workflow-card card-two"><span class="workflow-icon">02</span><div><small>Team workflow</small><strong>Assigned and in progress</strong></div><i>Active</i></div><div class="workflow-card card-three"><span class="workflow-icon">03</span><div><small>Resolution</small><strong>Service completed</strong></div><i>Done</i></div></div><div class="mini-stats"><div><strong>One place</strong><span>All customer records</span></div><div><strong>3 roles</strong><span>Built for your team</span></div><div><strong>24 x 7</strong><span>Always accessible</span></div></div></div><div class="login-side"><form class="login-card" id="loginForm"><div class="logo" style="color:var(--dark);margin-bottom:45px"><span class="logo-mark">DS</span>${state.brand.name}</div><div class="secure-pill"><i></i> Secure team workspace</div><h2>Welcome back</h2><p class="sub">Sign in to continue to your CRM workspace.</p><div class="field"><label>Email address or User ID</label><input id="loginId" required placeholder="Enter your email or user ID"></div><div class="field"><label>Password</label><div class="password-wrap"><input id="loginPass" type="password" required placeholder="Enter password"><button type="button" class="eye" id="showPass">Show</button></div></div><div style="display:flex;justify-content:space-between;font-size:11px;margin:-3px 0 18px"><label><input type="checkbox"> Remember me</label><a href="#" style="color:var(--green)">Forgot password?</a></div><button class="primary full login-submit"><span>Sign in to workspace</span><b>></b></button><p class="login-footnote">Role-based access &nbsp; | &nbsp; Secure sessions &nbsp; | &nbsp; Centralized records</p></form></div></section>`}
-const navItems=()=>[{id:'dashboard',label:'Dashboard',ico:'dash'},{id:'create',label:'Create Docket',ico:'plus'},{id:'dockets',label:'All Dockets',ico:'list'},...(session.role!=='user'?[{id:'reports',label:'Reports',ico:'report'}]:[]),...(session.role!=='user'?[{id:'logs',label:'System Logs',ico:'report'}]:[]),...(session.role==='admin'?[{id:'team',label:'User Management',ico:'user'},{id:'fields',label:'Custom Fields',ico:'settings'},{id:'mail',label:'Mail Configuration',ico:'settings'},{id:'organization',label:'Organization Settings',ico:'settings'},{id:'dialer',label:'Dialer Integration',ico:'settings'}]:[]),{id:'profile',label:'My Profile',ico:'user'}];
-function shell(content){return `<div class="mobile-overlay"></div><div class="app-shell"><aside class="sidebar"><div class="logo"><span class="logo-mark">DS</span>${state.brand.name}</div><div class="nav-label">Workspace</div><nav class="nav">${navItems().map(n=>`<button data-page="${n.id}" class="${page===n.id?'active':''}">${icon(n.ico)}${n.label}</button>`).join('')}</nav><div class="user-chip"><div class="avatar">${session.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</div><div><strong>${session.name}</strong><span>${session.role[0].toUpperCase()+session.role.slice(1)}</span></div><button class="logout" title="Logout">Exit</button></div></aside><main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="icon-btn menu-toggle">Menu</button><div class="page-title">${navItems().find(x=>x.id===page)?.label||'Dashboard'}</div></div><div class="top-actions"><button class="icon-btn top-search" title="Search dockets" aria-label="Search dockets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button><button class="icon-btn alert-button" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><i></i></button><button class="primary" id="quickCreate">+ Create Docket</button></div></header><div class="content">${content}</div></main></div>`}
-function dashboard(){let total=state.dockets.length,n=state.dockets.filter(d=>d.status==='New').length,progress=state.dockets.filter(d=>d.status==='In Progress').length,closed=state.dockets.filter(d=>d.status==='Closed').length;let bars=[45,68,53,82,60,91,74];return `<div class="welcome"><div><h2>Good ${new Date().getHours()<12?'morning':'afternoon'}, ${session.name.split(' ')[0]} </h2><p>Here is what's happening with your customer dockets today.</p></div><div class="date-pill">Date &nbsp; 12 October 2026</div></div><section class="stats">${[['Total Dockets',total,'+12% this month'],['New Enquiries',n,'Needs attention'],['In Progress',progress,'Active cases'],['Completed',closed,'+8% this month']].map((x,i)=>`<article class="card stat"><div class="stat-top"><span class="stat-label">${x[0]}</span><div class="stat-icon">${['#','+','Date','OK'][i]}</div></div><div class="stat-value">${x[1]}</div><span class="trend ${i==2?'neutral':''}">${x[2]}</span></article>`).join('')}</section><div class="grid-2"><section class="card"><div class="panel-head"><h3>Docket overview</h3><select class="outline"><option>Last 7 days</option><option>Last month</option></select></div><div class="panel-body"><div style="font-size:10px;color:var(--muted)"><b style="color:var(--green)">*</b> Created &nbsp; <b style="color:#b4e8dd">*</b> Completed</div><div class="chart">${bars.map((b,i)=>`<div class="bar-group"><div class="bar" style="height:${Math.max(18,b-22)}%"></div><div class="bar alt" style="height:${b}%"></div><span class="bar-label">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</span></div>`).join('')}</div></div></section><section class="card"><div class="panel-head"><h3>Recent activity</h3><button class="outline" data-page="dockets">View all</button></div><div class="panel-body">${state.dockets.slice(0,4).map(d=>`<div class="activity"><i class="dot"></i><div><strong>${d.name} - ${d.location}</strong><span>${d.id} was ${d.status==='New'?'created':'updated'} - ${d.created}</span></div></div>`).join('')}</div></section></div>`}
-function createDocket(){let next=`DS-${new Date().toISOString().slice(2,10).replaceAll('-','')}-${String(Math.floor(1000+Math.random()*9000))}`;return `<div class="form-shell"><form class="section-card form-card" id="docketForm"><h3>Customer & docket details</h3><div class="form-grid"><div class="field"><label>Mobile Number *</label><input name="number" required maxlength="15" placeholder="e.g. 98765 43210"></div><div class="field"><label>Customer Name *</label><input name="name" required placeholder="Full name"></div><div class="field"><label>Email Address *</label><input name="email" type="email" required placeholder="customer@email.com"></div><div class="field"><label>Location / Service Area *</label><input name="location" required placeholder="e.g. Goa, Manali"></div><div class="field span-2"><label>Address</label><textarea name="address" placeholder="Customer's complete address"></textarea></div><div class="field span-2"><label>Query / Requirement *</label><textarea name="query" required placeholder="Describe the customer request"></textarea></div><div class="field span-2"><label>Remarks</label><textarea name="remark" placeholder="Any additional notes..."></textarea></div>${state.fields.filter(f=>f.enabled).map(f=>`<div class="field ${f.type==='Checkbox'?'':'span-2'}"><label>${f.label}</label>${f.type==='Dropdown'?`<select name="field_${f.id}"><option value="">Select an option</option>${f.options.split(',').map(o=>`<option>${o.trim()}</option>`).join('')}</select>`:`<label style="padding:10px 0"><input type="checkbox" name="field_${f.id}" style="width:auto"> Yes, required</label>`}</div>`).join('')}</div><input type="hidden" name="id" value="${next}"><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px"><button type="reset" class="outline">Clear form</button><button class="primary">Create Docket & Send Email ></button></div></form><aside class="section-card side-info"><h3>Docket reference</h3><div class="docket-preview">${next}</div><div class="info-box" style="margin-top:17px"><b>What happens next?</b><br>OK Docket saves to your workspace<br>OK Customer receives a confirmation email<br>OK Admin & support can track the request</div><div class="info-box"><b>Email variables used</b><br>{{customer_name}}<br>{{docket_number}}<br>{{location}}</div></aside></div>`}
-function docketTable(){return `<section class="section-card"><div class="toolbar"><input class="search" id="search" placeholder="Search  Search name, number or docket ID"><select id="statusFilter"><option value="">All status</option><option>New</option><option>In Progress</option><option>Closed</option></select><input type="date" id="dateFilter"><button class="outline" id="clearFilter">Clear</button></div><div class="table-wrap"><table><thead><tr><th>Docket ID</th><th>Customer</th><th>Location</th><th>Query</th><th>Created</th><th>Status</th><th>Email</th><th>Action</th></tr></thead><tbody id="docketRows">${rows(state.dockets)}</tbody></table></div></section>`}
-function rows(ds){return ds.length?ds.map(d=>`<tr><td><strong>${d.id}</strong></td><td>${d.name}<br><small style="color:var(--muted)">${d.number}</small></td><td>${d.location}</td><td>${d.query}</td><td>${d.created}</td><td><span class="badge ${d.status==='In Progress'?'pending':d.status==='Closed'?'closed':''}">${d.status}</span></td><td><span class="badge email-${(d.emailStatus||'Not sent').toLowerCase()}">${d.emailStatus||'Not sent'}</span></td><td><button class="outline view-docket" data-id="${d.id}">View</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty">No matching dockets found.</td></tr>`}
-const reportFields=()=>state.fields.filter(field=>field.enabled);
-const reportFieldValue=(docket,field)=>{let value=docket['field_'+field.id];if(field.type==='Checkbox')return value?'Yes':'No';return value||''};
-function reports(){let custom=reportFields();return `<div class="welcome"><div><h2>Reports & exports</h2><p>Active custom fields are included automatically in preview and CSV exports.</p></div>${session.role==='support'&&!state.reportsAllowed?'<span class="badge pending">Access disabled by admin</span>':''}</div><section class="section-card"><div class="toolbar"><select id="reportRange"><option>Daily report</option><option>Weekly report</option><option>Monthly report</option><option>Custom range</option></select><input type="date"><input type="date"><select><option>All users</option><option>Amit Kumar</option><option>Priya Support</option></select><button class="primary" id="downloadReport" ${session.role==='support'&&!state.reportsAllowed?'disabled':''}>Download CSV</button></div><div class="panel-body"><div class="stats" style="margin:0 0 20px">${[['Total',state.dockets.length],['New',state.dockets.filter(x=>x.status==='New').length],['In progress',state.dockets.filter(x=>x.status==='In Progress').length],['Closed',state.dockets.filter(x=>x.status==='Closed').length]].map(x=>`<div class="stat" style="background:#f7faf8;border-radius:12px"><span class="stat-label">${x[0]}</span><div class="stat-value">${x[1]}</div></div>`).join('')}</div><div class="report-note">${custom.length} active custom field${custom.length===1?'':'s'} included in this report</div></div><div class="table-wrap"><table><thead><tr><th>Docket ID</th><th>Customer</th><th>Mobile</th><th>Destination</th>${custom.map(field=>`<th>${field.label}</th>`).join('')}<th>Status</th><th>Created</th></tr></thead><tbody>${state.dockets.map(docket=>`<tr><td><strong>${docket.id}</strong></td><td>${docket.name}</td><td>${docket.number}</td><td>${docket.location}</td>${custom.map(field=>`<td>${reportFieldValue(docket,field)||'-'}</td>`).join('')}<td><span class="badge">${docket.status}</span></td><td>${docket.created}</td></tr>`).join('')}</tbody></table></div></section>`}
-function fields(){return `<div class="settings-grid"><section class="section-card settings-card"><h3>Custom docket fields</h3><p>Create flexible fields that appear in the user and support docket form.</p><div id="fieldList">${state.fields.map(f=>`<div class="dynamic-item"><div><strong>${f.label}</strong><span>${f.type}${f.options?' - '+f.options:''}</span></div><button class="outline edit-field" data-edit-field="${f.id}">Edit</button><button class="switch ${f.enabled?'on':''}" data-toggle-field="${f.id}"></button><button class="danger-btn" data-delete-field="${f.id}">x</button></div>`).join('')}</div><button class="primary" id="addField">+ Add new field</button></section><section class="section-card settings-card"><h3>Role permissions</h3><p>Control what support users can access.</p><div class="toggle-row"><div><strong>Support report download</strong><span>Allow support agents to export CSV reports</span></div><button class="switch ${state.reportsAllowed?'on':''}" id="reportPermission"></button></div><div class="toggle-row"><div><strong>Support docket creation</strong><span>Allow support to create customer dockets</span></div><button class="switch on"></button></div><div class="toggle-row"><div><strong>User email confirmation</strong><span>Send confirmation after docket creation</span></div><button class="switch on"></button></div></section></div>`}
-function mail(){return `<div class="settings-grid"><form class="section-card settings-card" id="smtpForm"><h3>SMTP configuration</h3><p>Connect Gmail, Microsoft 365, Zoho or any standards-based SMTP provider.</p><div class="field"><label>Email Provider</label><select name="provider" id="mailProvider"><option ${state.mail.provider==='Gmail'?'selected':''}>Gmail</option><option ${state.mail.provider==='Microsoft 365 / Outlook'?'selected':''}>Microsoft 365 / Outlook</option><option ${state.mail.provider==='Zoho Mail'?'selected':''}>Zoho Mail</option><option ${state.mail.provider==='SendGrid'?'selected':''}>SendGrid</option><option ${state.mail.provider==='Mailgun'?'selected':''}>Mailgun</option><option ${state.mail.provider==='Amazon SES'?'selected':''}>Amazon SES</option><option ${state.mail.provider==='Custom SMTP'?'selected':''}>Custom SMTP</option></select></div><div id="providerHint" class="provider-hint"></div><div class="field"><label>SMTP Host</label><input name="host" required value="${state.mail.host}" placeholder="smtp.example.com"></div><div class="form-grid"><div class="field"><label>Port</label><input name="port" required value="${state.mail.port}"></div><div class="field"><label>Security</label><select name="security"><option ${state.mail.security==='STARTTLS'?'selected':''}>STARTTLS</option><option ${state.mail.security==='SSL/TLS'?'selected':''}>SSL/TLS</option><option ${state.mail.security==='None'?'selected':''}>None</option></select></div></div><div class="field"><label>SMTP Username</label><input name="username" required value="${state.mail.username||state.mail.sender}" autocomplete="username"></div><div class="field"><label>Sender Email</label><input name="sender" type="email" required value="${state.mail.sender}"></div><div class="field"><label>SMTP / App Password</label><input id="mailPassword" type="password" placeholder="Leave blank to keep saved password" autocomplete="current-password"><small class="field-help">For Gmail, use a 16-character Google App Password. Saved passwords are encrypted on the server.</small></div><div class="smtp-actions"><button class="primary" id="saveSmtp">Save SMTP Configuration</button></div><hr class="settings-divider"><div class="field"><label>Send Test Email To</label><input id="testRecipient" type="email" placeholder="you@company.com"></div><button type="button" class="outline" id="testMail">Test SMTP & Send Email</button><div id="mailTestResult" class="mail-test-result hidden"></div></form><form class="section-card settings-card" id="templateForm"><h3>Docket confirmation template</h3><p>Personalise automated emails with smart variables.</p><div class="field"><label>Subject</label><input name="subject" required value="${state.mail.subject}"></div><div class="field"><label>Email Body</label><textarea name="body" required style="min-height:190px">${state.mail.body}</textarea></div><div class="info-box"><b>Available variables:</b><br>{{customer_name}} &nbsp; {{docket_number}}<br>{{location}} &nbsp; {{mobile_number}}</div><button class="primary">Save Email Template</button><div id="templateSaveResult" class="mail-test-result hidden"></div></form></div><section class="section-card mail-log-card"><div class="panel-head"><div><h3>Mail delivery logs</h3><small id="smtpStatus">Loading SMTP status...</small></div><button class="outline" id="refreshMailLogs">Refresh logs</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Docket</th><th>Recipient</th><th>Status</th><th>Details</th></tr></thead><tbody id="mailLogRows"><tr><td colspan="6" class="empty">Loading delivery logs...</td></tr></tbody></table></div></section>`}
-async function loadMailLogs(){let body=$('#mailLogRows'),status=$('#smtpStatus');if(!body)return;try{let response=await fetch('/api/mail/logs'),data=await response.json();status.textContent=data.smtpActive?'SMTP active - automatic emails enabled':'SMTP inactive - run a successful test before creating a docket';status.className=data.smtpActive?'smtp-active':'smtp-inactive';body.innerHTML=data.logs.length?data.logs.map(log=>`<tr><td>${new Date(log.timestamp).toLocaleString('en-IN')}</td><td>${log.type==='smtp-test'?'SMTP Test':'Docket Email'}</td><td>${log.docketId||'-'}</td><td>${log.recipient||'-'}</td><td><span class="badge ${log.status==='failed'?'email-failed':'email-sent'}">${log.status}</span></td><td class="log-detail">${log.error||log.messageId||'-'}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">No mail activity recorded yet.</td></tr>'}catch(error){status.textContent='Could not load mail service status';status.className='smtp-inactive';body.innerHTML='<tr><td colspan="6" class="empty">Mail logs unavailable.</td></tr>'}}
-function team(){return `<section class="section-card"><div class="panel-head"><div><h3>Team members</h3><small style="color:var(--muted)">Manage CRM users and role access.</small></div><button class="primary" id="addUser">+ Add User</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email / Login ID</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>${state.team.map(u=>`<tr><td><strong>${u.name}</strong></td><td>${u.email}</td><td>${u.role}</td><td><span class="badge ${u.status==='Inactive'?'closed':''}">${u.status}</span></td><td><button class="outline toggle-user" data-user="${u.id}">${u.status==='Active'?'Disable':'Enable'}</button></td></tr>`).join('')}</tbody></table></div></section>`}
-function dialer(){let d=state.dialer;return `<form class="settings-grid" id="dialerForm"><section class="section-card settings-card"><h3>Dialer API connection</h3><p>Connect any HTTP-based dialer provider without changing the CRM interface.</p><div class="field"><label>Provider</label><select name="provider"><option ${d.provider==='Custom API'?'selected':''}>Custom API</option><option ${d.provider==='Exotel'?'selected':''}>Exotel</option><option ${d.provider==='Knowlarity'?'selected':''}>Knowlarity</option><option ${d.provider==='MyOperator'?'selected':''}>MyOperator</option></select></div><div class="field"><label>API Base URL</label><input name="baseUrl" value="${d.baseUrl}" placeholder="https://api.provider.com/v1"></div><div class="field"><label>API Key</label><input name="apiKey" type="password" value="${d.apiKey}" placeholder="Enter API key"></div><button type="button" class="outline" id="testDialer">Test connection</button></section><section class="section-card settings-card"><h3>Call workflow</h3><p>Configure how calls appear against customer dockets.</p><div class="field"><label>Incoming Webhook Path</label><input name="webhookUrl" value="${d.webhookUrl}" readonly></div><div class="toggle-row"><div><strong>Click-to-call</strong><span>Start calls from a docket</span></div><button type="button" class="switch ${d.clickToCall?'on':''}" data-dialer-toggle="clickToCall"></button></div><div class="toggle-row"><div><strong>Automatic call logging</strong><span>Attach call results and duration to docket notes</span></div><button type="button" class="switch ${d.autoLog?'on':''}" data-dialer-toggle="autoLog"></button></div><button class="primary" style="margin-top:20px">Save dialer settings</button></section></form>`}
-function organization(){let b=state.brand;return `<form class="settings-grid" id="organizationForm"><section class="section-card settings-card"><h3>Organization branding</h3><p>Customize this CRM for any company or service business.</p><div class="field"><label>Company / Brand Name</label><input name="name" required value="${b.name}"></div><div class="field"><label>CRM Label</label><input name="label" required value="${b.label}" placeholder="Customer Operations CRM"></div><div class="field"><label>Login Headline</label><input name="headline" required value="${b.headline}"></div></section><section class="section-card settings-card"><h3>Login page message</h3><p>This message introduces the CRM to company users.</p><div class="field"><label>Description</label><textarea name="description" style="min-height:150px">${b.description}</textarea></div><div class="info-box"><b>White-label ready</b><br>Changes apply to the login page, sidebar and browser title. Custom fields can adapt the docket form for any industry.</div><button class="primary">Save organization settings</button></section></form>`}
+const $ = (s) => document.querySelector(s),
+  $$ = (s) => [...document.querySelectorAll(s)];
+const icon = (n) =>
+  ({
+    dash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>',
+    list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+    report:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V9M10 19V5M16 19v-7M22 19V2"/></svg>',
+    settings:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a2 2 0 0 0 .4 2.2l.1.1-2.6 2.6-.1-.1a2 2 0 0 0-2.2-.4 2 2 0 0 0-1.2 1.8V21h-3.6v-.2A2 2 0 0 0 9 19a2 2 0 0 0-2.2.4l-.1.1-2.6-2.6.1-.1A2 2 0 0 0 4.6 15a2 2 0 0 0-1.8-1.2H3v-3.6h.2A2 2 0 0 0 5 9a2 2 0 0 0-.4-2.2l-.1-.1 2.6-2.6.1.1A2 2 0 0 0 9 4.6a2 2 0 0 0 1.2-1.8V3h3.6v.2A2 2 0 0 0 15 5a2 2 0 0 0 2.2-.4l.1-.1 2.6 2.6-.1.1A2 2 0 0 0 19.4 9a2 2 0 0 0 1.8 1.2h.2v3.6h-.2A2 2 0 0 0 19.4 15z"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  })[n];
+const seed = [
+  {
+    id: "DS-261012-1042",
+    number: "9876543210",
+    name: "Aarav Mehta",
+    email: "aarav@email.com",
+    location: "Goa",
+    query: "Family holiday package",
+    remark: "4 nights, beach property",
+    status: "New",
+    created: "2026-10-12",
+    owner: "User",
+  },
+  {
+    id: "DS-261011-7831",
+    number: "9988776655",
+    name: "Neha Shah",
+    email: "neha@email.com",
+    location: "Manali",
+    query: "Honeymoon booking",
+    remark: "December first week",
+    status: "In Progress",
+    created: "2026-10-11",
+    owner: "User",
+  },
+  {
+    id: "DS-261009-4610",
+    number: "9123456780",
+    name: "Rohan Das",
+    email: "rohan@email.com",
+    location: "Jaipur",
+    query: "Corporate group tour",
+    remark: "18 persons",
+    status: "Closed",
+    created: "2026-10-09",
+    owner: "Support",
+  },
+];
+let state = JSON.parse(localStorage.getItem("dhruvSetuState") || "null") || {
+  dockets: seed,
+  fields: [
+    {
+      id: 1,
+      label: "Preferred Hotel Category",
+      type: "Dropdown",
+      options: "3 Star, 4 Star, 5 Star",
+      enabled: true,
+    },
+    {
+      id: 2,
+      label: "Need Airport Pickup?",
+      type: "Checkbox",
+      options: "",
+      enabled: true,
+    },
+  ],
+  reportsAllowed: true,
+  mail: {
+    host: "smtp.gmail.com",
+    port: "587",
+    sender: "bookings@dhruvsetu.in",
+    subject: "Your booking request {{docket_number}}",
+    body: "Hello {{customer_name}},\n\nYour docket {{docket_number}} has been created for {{location}}. Our travel team will contact you shortly.\n\nThank you,\nDhruv-Setu Team",
+  },
+};
+state.brand ||= {
+  name: "Dhruv-Setu",
+  label: "Customer Operations CRM",
+  headline: "Every customer, beautifully managed.",
+  description:
+    "From first enquiry to final resolution - bring your customers, service requests and team together in one seamless workspace.",
+};
+if (state.brand.headline === "Every customer, beautifully managed.")
+  state.brand.headline = "Customer operations, simplified.";
+if (
+  state.brand.description ===
+  "From first enquiry to final resolution - bring your customers, service requests and team together in one seamless workspace."
+)
+  state.brand.description =
+    "Capture enquiries, coordinate teams and resolve every request from one secure workspace.";
+state.team ||= [
+  {
+    id: 1,
+    name: "Amit Kumar",
+    email: "user@dhruvsetu.in",
+    role: "User",
+    status: "Active",
+  },
+  {
+    id: 2,
+    name: "Priya Support",
+    email: "support@dhruvsetu.in",
+    role: "Support",
+    status: "Active",
+  },
+  {
+    id: 3,
+    name: "Balram Admin",
+    email: "admin@dhruvsetu.in",
+    role: "Admin",
+    status: "Active",
+  },
+];
+state.mail.provider ||= state.mail.host.includes("gmail")
+  ? "Gmail"
+  : state.mail.host.includes("office365")
+    ? "Microsoft 365 / Outlook"
+    : state.mail.host.includes("zoho")
+      ? "Zoho Mail"
+      : "Custom SMTP";
+state.dialer ||= {
+  provider: "Custom API",
+  baseUrl: "",
+  apiKey: "",
+  webhookUrl: "/api/dialer/webhook",
+  clickToCall: true,
+  autoLog: true,
+};
+state.dockets.forEach((d) => (d.notes ||= []));
+let session = null,
+  page = "dashboard";
+const save = () =>
+  localStorage.setItem("dhruvSetuState", JSON.stringify(state));
+const recordAudit = (action, details, status = "success", docketId = "") =>
+  fetch("/api/audit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      action,
+      details,
+      status,
+      docketId,
+      user: session?.name || "Guest",
+      role: session?.role || "Public",
+    }),
+  }).catch(() => {});
+const toast = (m) => {
+  const e = $("#toast");
+  e.textContent = m;
+  e.classList.add("show");
+  setTimeout(() => e.classList.remove("show"), 2600);
+};
+const api = async (path, options = {}) => {
+  let response = await fetch(path, {
+      ...options,
+      headers: {
+        "content-type": "application/json",
+        ...(options.headers || {}),
+      },
+    }),
+    payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "Request failed.");
+  return payload;
+};
+const loadWorkspace = async () => {
+  let payload = await api("/api/bootstrap");
+  state.dockets = payload.dockets || [];
+  save();
+};
+function loginView() {
+  return `<section class="login-shell"><div class="brand-panel"><div class="logo"><span class="logo-mark">DS</span>${state.brand.name}</div><div class="brand-copy"><span class="eyebrow">${state.brand.label}</span><h1>${state.brand.headline}</h1><p>${state.brand.description}</p><div class="capability-row"><span>Capture enquiries</span><span>Assign ownership</span><span>Track resolution</span></div></div><div class="login-workflow" aria-hidden="true"><div class="workflow-card card-one"><span class="workflow-icon">01</span><div><small>New request</small><strong>Customer enquiry received</strong></div><i>New</i></div><div class="workflow-line"><b></b></div><div class="workflow-card card-two"><span class="workflow-icon">02</span><div><small>Team workflow</small><strong>Assigned and in progress</strong></div><i>Active</i></div><div class="workflow-card card-three"><span class="workflow-icon">03</span><div><small>Resolution</small><strong>Service completed</strong></div><i>Done</i></div></div><div class="mini-stats"><div><strong>One place</strong><span>All customer records</span></div><div><strong>3 roles</strong><span>Built for your team</span></div><div><strong>24 x 7</strong><span>Always accessible</span></div></div></div><div class="login-side"><form class="login-card" id="loginForm"><div class="logo" style="color:var(--dark);margin-bottom:45px"><span class="logo-mark">DS</span>${state.brand.name}</div><div class="secure-pill"><i></i> Secure team workspace</div><h2>Welcome back</h2><p class="sub">Sign in to continue to your CRM workspace.</p><div class="field"><label>Email address or User ID</label><input id="loginId" required placeholder="Enter your email or user ID"></div><div class="field"><label>Password</label><div class="password-wrap"><input id="loginPass" type="password" required placeholder="Enter password"><button type="button" class="eye" id="showPass">Show</button></div></div><div style="display:flex;justify-content:space-between;font-size:11px;margin:-3px 0 18px"><label><input type="checkbox"> Remember me</label><a href="#" style="color:var(--green)">Forgot password?</a></div><button class="primary full login-submit"><span>Sign in to workspace</span><b>></b></button><p class="login-footnote">Role-based access &nbsp; | &nbsp; Secure sessions &nbsp; | &nbsp; Centralized records</p></form></div></section>`;
+}
+const navItems = () => [
+  { id: "dashboard", label: "Dashboard", ico: "dash" },
+  { id: "create", label: "Create Docket", ico: "plus" },
+  { id: "dockets", label: "All Dockets", ico: "list" },
+  ...(session.role !== "user"
+    ? [{ id: "reports", label: "Reports", ico: "report" }]
+    : []),
+  ...(session.role !== "user"
+    ? [{ id: "logs", label: "System Logs", ico: "report" }]
+    : []),
+  ...(session.role === "admin"
+    ? [
+        { id: "team", label: "User Management", ico: "user" },
+        { id: "fields", label: "Custom Fields", ico: "settings" },
+        { id: "mail", label: "Mail Configuration", ico: "settings" },
+        { id: "organization", label: "Organization Settings", ico: "settings" },
+        { id: "dialer", label: "Dialer Integration", ico: "settings" },
+      ]
+    : []),
+  { id: "profile", label: "My Profile", ico: "user" },
+];
+function shell(content) {
+  return `<div class="mobile-overlay"></div><div class="app-shell"><aside class="sidebar"><div class="logo"><span class="logo-mark">DS</span>${state.brand.name}</div><div class="nav-label">Workspace</div><nav class="nav">${navItems()
+    .map(
+      (n) =>
+        `<button data-page="${n.id}" class="${page === n.id ? "active" : ""}">${icon(n.ico)}${n.label}</button>`,
+    )
+    .join("")}</nav><div class="user-chip"><div class="avatar">${session.name
+    .split(" ")
+    .map((x) => x[0])
+    .join("")
+    .slice(
+      0,
+      2,
+    )}</div><div><strong>${session.name}</strong><span>${session.role[0].toUpperCase() + session.role.slice(1)}</span></div><button class="logout" title="Logout">Exit</button></div></aside><main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="icon-btn menu-toggle">Menu</button><div class="page-title">${navItems().find((x) => x.id === page)?.label || "Dashboard"}</div></div><div class="top-actions"><button class="icon-btn top-search" title="Search dockets" aria-label="Search dockets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button><button class="icon-btn alert-button" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><i></i></button><button class="primary" id="quickCreate">+ Create Docket</button></div></header><div class="content">${content}</div></main></div>`;
+}
+function dashboard() {
+  let total = state.dockets.length,
+    n = state.dockets.filter((d) => d.status === "New").length,
+    progress = state.dockets.filter((d) => d.status === "In Progress").length,
+    closed = state.dockets.filter((d) => d.status === "Closed").length;
+  let bars = [45, 68, 53, 82, 60, 91, 74];
+  return `<div class="welcome"><div><h2>Good ${new Date().getHours() < 12 ? "morning" : "afternoon"}, ${session.name.split(" ")[0]} </h2><p>Here is what's happening with your customer dockets today.</p></div><div class="date-pill">Date &nbsp; 12 October 2026</div></div><section class="stats">${[
+    ["Total Dockets", total, "+12% this month"],
+    ["New Enquiries", n, "Needs attention"],
+    ["In Progress", progress, "Active cases"],
+    ["Completed", closed, "+8% this month"],
+  ]
+    .map(
+      (x, i) =>
+        `<article class="card stat"><div class="stat-top"><span class="stat-label">${x[0]}</span><div class="stat-icon">${["#", "+", "Date", "OK"][i]}</div></div><div class="stat-value">${x[1]}</div><span class="trend ${i == 2 ? "neutral" : ""}">${x[2]}</span></article>`,
+    )
+    .join(
+      "",
+    )}</section><div class="grid-2"><section class="card"><div class="panel-head"><h3>Docket overview</h3><select class="outline"><option>Last 7 days</option><option>Last month</option></select></div><div class="panel-body"><div style="font-size:10px;color:var(--muted)"><b style="color:var(--green)">*</b> Created &nbsp; <b style="color:#b4e8dd">*</b> Completed</div><div class="chart">${bars.map((b, i) => `<div class="bar-group"><div class="bar" style="height:${Math.max(18, b - 22)}%"></div><div class="bar alt" style="height:${b}%"></div><span class="bar-label">${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}</span></div>`).join("")}</div></div></section><section class="card"><div class="panel-head"><h3>Recent activity</h3><button class="outline" data-page="dockets">View all</button></div><div class="panel-body">${state.dockets
+    .slice(0, 4)
+    .map(
+      (d) =>
+        `<div class="activity"><i class="dot"></i><div><strong>${d.name} - ${d.location}</strong><span>${d.id} was ${d.status === "New" ? "created" : "updated"} - ${d.created}</span></div></div>`,
+    )
+    .join("")}</div></section></div>`;
+}
+function createDocket() {
+  let next = `DS-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${String(Math.floor(1000 + Math.random() * 9000))}`;
+  return `<div class="form-shell"><form class="section-card form-card" id="docketForm"><h3>Customer & docket details</h3><div class="form-grid"><div class="field"><label>Mobile Number *</label><input name="number" required maxlength="15" placeholder="e.g. 98765 43210"></div><div class="field"><label>Customer Name *</label><input name="name" required placeholder="Full name"></div><div class="field"><label>Email Address *</label><input name="email" type="email" required placeholder="customer@email.com"></div><div class="field"><label>Location / Service Area *</label><input name="location" required placeholder="e.g. Goa, Manali"></div><div class="field span-2"><label>Address</label><textarea name="address" placeholder="Customer's complete address"></textarea></div><div class="field span-2"><label>Query / Requirement *</label><textarea name="query" required placeholder="Describe the customer request"></textarea></div><div class="field span-2"><label>Remarks</label><textarea name="remark" placeholder="Any additional notes..."></textarea></div>${state.fields
+    .filter((f) => f.enabled)
+    .map(
+      (f) =>
+        `<div class="field ${f.type === "Checkbox" ? "" : "span-2"}"><label>${f.label}</label>${
+          f.type === "Dropdown"
+            ? `<select name="field_${f.id}"><option value="">Select an option</option>${f.options
+                .split(",")
+                .map((o) => `<option>${o.trim()}</option>`)
+                .join("")}</select>`
+            : `<label style="padding:10px 0"><input type="checkbox" name="field_${f.id}" style="width:auto"> Yes, required</label>`
+        }</div>`,
+    )
+    .join(
+      "",
+    )}</div><input type="hidden" name="id" value="${next}"><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px"><button type="reset" class="outline">Clear form</button><button class="primary">Create Docket & Send Email ></button></div></form><aside class="section-card side-info"><h3>Docket reference</h3><div class="docket-preview">${next}</div><div class="info-box" style="margin-top:17px"><b>What happens next?</b><br>OK Docket saves to your workspace<br>OK Customer receives a confirmation email<br>OK Admin & support can track the request</div><div class="info-box"><b>Email variables used</b><br>{{customer_name}}<br>{{docket_number}}<br>{{location}}</div></aside></div>`;
+}
+function docketTable() {
+  return `<section class="section-card"><div class="toolbar"><input class="search" id="search" placeholder="Search  Search name, number or docket ID"><select id="statusFilter"><option value="">All status</option><option>New</option><option>In Progress</option><option>Closed</option></select><input type="date" id="dateFilter"><button class="outline" id="clearFilter">Clear</button></div><div class="table-wrap"><table><thead><tr><th>Docket ID</th><th>Customer</th><th>Location</th><th>Query</th><th>Created</th><th>Status</th><th>Email</th><th>Action</th></tr></thead><tbody id="docketRows">${rows(state.dockets)}</tbody></table></div></section>`;
+}
+function rows(ds) {
+  return ds.length
+    ? ds
+        .map(
+          (d) =>
+            `<tr><td><strong>${d.id}</strong></td><td>${d.name}<br><small style="color:var(--muted)">${d.number}</small></td><td>${d.location}</td><td>${d.query}</td><td>${d.created}</td><td><span class="badge ${d.status === "In Progress" ? "pending" : d.status === "Closed" ? "closed" : ""}">${d.status}</span></td><td><span class="badge email-${(d.emailStatus || "Not sent").toLowerCase()}">${d.emailStatus || "Not sent"}</span></td><td><button class="outline view-docket" data-id="${d.id}">View</button></td></tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="8" class="empty">No matching dockets found.</td></tr>`;
+}
+const reportFields = () => state.fields.filter((field) => field.enabled);
+const reportFieldValue = (docket, field) => {
+  let value = docket["field_" + field.id];
+  if (field.type === "Checkbox") return value ? "Yes" : "No";
+  return value || "";
+};
+function reports() {
+  let custom = reportFields();
+  return `<div class="welcome"><div><h2>Reports & exports</h2><p>Active custom fields are included automatically in preview and CSV exports.</p></div>${session.role === "support" && !state.reportsAllowed ? '<span class="badge pending">Access disabled by admin</span>' : ""}</div><section class="section-card"><div class="toolbar"><select id="reportRange"><option>Daily report</option><option>Weekly report</option><option>Monthly report</option><option>Custom range</option></select><input type="date"><input type="date"><select><option>All users</option><option>Amit Kumar</option><option>Priya Support</option></select><button class="primary" id="downloadReport" ${session.role === "support" && !state.reportsAllowed ? "disabled" : ""}>Download CSV</button></div><div class="panel-body"><div class="stats" style="margin:0 0 20px">${[
+    ["Total", state.dockets.length],
+    ["New", state.dockets.filter((x) => x.status === "New").length],
+    [
+      "In progress",
+      state.dockets.filter((x) => x.status === "In Progress").length,
+    ],
+    ["Closed", state.dockets.filter((x) => x.status === "Closed").length],
+  ]
+    .map(
+      (x) =>
+        `<div class="stat" style="background:#f7faf8;border-radius:12px"><span class="stat-label">${x[0]}</span><div class="stat-value">${x[1]}</div></div>`,
+    )
+    .join(
+      "",
+    )}</div><div class="report-note">${custom.length} active custom field${custom.length === 1 ? "" : "s"} included in this report</div></div><div class="table-wrap"><table><thead><tr><th>Docket ID</th><th>Customer</th><th>Mobile</th><th>Destination</th>${custom.map((field) => `<th>${field.label}</th>`).join("")}<th>Status</th><th>Created</th></tr></thead><tbody>${state.dockets.map((docket) => `<tr><td><strong>${docket.id}</strong></td><td>${docket.name}</td><td>${docket.number}</td><td>${docket.location}</td>${custom.map((field) => `<td>${reportFieldValue(docket, field) || "-"}</td>`).join("")}<td><span class="badge">${docket.status}</span></td><td>${docket.created}</td></tr>`).join("")}</tbody></table></div></section>`;
+}
+function fields() {
+  return `<div class="settings-grid"><section class="section-card settings-card"><h3>Custom docket fields</h3><p>Create flexible fields that appear in the user and support docket form.</p><div id="fieldList">${state.fields.map((f) => `<div class="dynamic-item"><div><strong>${f.label}</strong><span>${f.type}${f.options ? " - " + f.options : ""}</span></div><button class="outline edit-field" data-edit-field="${f.id}">Edit</button><button class="switch ${f.enabled ? "on" : ""}" data-toggle-field="${f.id}"></button><button class="danger-btn" data-delete-field="${f.id}">x</button></div>`).join("")}</div><button class="primary" id="addField">+ Add new field</button></section><section class="section-card settings-card"><h3>Role permissions</h3><p>Control what support users can access.</p><div class="toggle-row"><div><strong>Support report download</strong><span>Allow support agents to export CSV reports</span></div><button class="switch ${state.reportsAllowed ? "on" : ""}" id="reportPermission"></button></div><div class="toggle-row"><div><strong>Support docket creation</strong><span>Allow support to create customer dockets</span></div><button class="switch on"></button></div><div class="toggle-row"><div><strong>User email confirmation</strong><span>Send confirmation after docket creation</span></div><button class="switch on"></button></div></section></div>`;
+}
+function mail() {
+  return `<div class="settings-grid"><form class="section-card settings-card" id="smtpForm"><h3>SMTP configuration</h3><p>Connect Gmail, Microsoft 365, Zoho or any standards-based SMTP provider.</p><div class="field"><label>Email Provider</label><select name="provider" id="mailProvider"><option ${state.mail.provider === "Gmail" ? "selected" : ""}>Gmail</option><option ${state.mail.provider === "Microsoft 365 / Outlook" ? "selected" : ""}>Microsoft 365 / Outlook</option><option ${state.mail.provider === "Zoho Mail" ? "selected" : ""}>Zoho Mail</option><option ${state.mail.provider === "SendGrid" ? "selected" : ""}>SendGrid</option><option ${state.mail.provider === "Mailgun" ? "selected" : ""}>Mailgun</option><option ${state.mail.provider === "Amazon SES" ? "selected" : ""}>Amazon SES</option><option ${state.mail.provider === "Custom SMTP" ? "selected" : ""}>Custom SMTP</option></select></div><div id="providerHint" class="provider-hint"></div><div class="field"><label>SMTP Host</label><input name="host" required value="${state.mail.host}" placeholder="smtp.example.com"></div><div class="form-grid"><div class="field"><label>Port</label><input name="port" required value="${state.mail.port}"></div><div class="field"><label>Security</label><select name="security"><option ${state.mail.security === "STARTTLS" ? "selected" : ""}>STARTTLS</option><option ${state.mail.security === "SSL/TLS" ? "selected" : ""}>SSL/TLS</option><option ${state.mail.security === "None" ? "selected" : ""}>None</option></select></div></div><div class="field"><label>SMTP Username</label><input name="username" required value="${state.mail.username || state.mail.sender}" autocomplete="username"></div><div class="field"><label>Sender Email</label><input name="sender" type="email" required value="${state.mail.sender}"></div><div class="field"><label>SMTP / App Password</label><input id="mailPassword" type="password" placeholder="Leave blank to keep saved password" autocomplete="current-password"><small class="field-help">For Gmail, use a 16-character Google App Password. Saved passwords are encrypted on the server.</small></div><div class="smtp-actions"><button class="primary" id="saveSmtp">Save SMTP Configuration</button></div><hr class="settings-divider"><div class="field"><label>Send Test Email To</label><input id="testRecipient" type="email" placeholder="you@company.com"></div><button type="button" class="outline" id="testMail">Test SMTP & Send Email</button><div id="mailTestResult" class="mail-test-result hidden"></div></form><form class="section-card settings-card" id="templateForm"><h3>Docket confirmation template</h3><p>Personalise automated emails with smart variables.</p><div class="field"><label>Subject</label><input name="subject" required value="${state.mail.subject}"></div><div class="field"><label>Email Body</label><textarea name="body" required style="min-height:190px">${state.mail.body}</textarea></div><div class="info-box"><b>Available variables:</b><br>{{customer_name}} &nbsp; {{docket_number}}<br>{{location}} &nbsp; {{mobile_number}}</div><button class="primary">Save Email Template</button><div id="templateSaveResult" class="mail-test-result hidden"></div></form></div><section class="section-card mail-log-card"><div class="panel-head"><div><h3>Mail delivery logs</h3><small id="smtpStatus">Loading SMTP status...</small></div><button class="outline" id="refreshMailLogs">Refresh logs</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Docket</th><th>Recipient</th><th>Status</th><th>Details</th></tr></thead><tbody id="mailLogRows"><tr><td colspan="6" class="empty">Loading delivery logs...</td></tr></tbody></table></div></section>`;
+}
+async function loadMailLogs() {
+  let body = $("#mailLogRows"),
+    status = $("#smtpStatus");
+  if (!body) return;
+  try {
+    let response = await fetch("/api/mail/logs"),
+      data = await response.json();
+    status.textContent = data.smtpActive
+      ? "SMTP active - automatic emails enabled"
+      : "SMTP inactive - run a successful test before creating a docket";
+    status.className = data.smtpActive ? "smtp-active" : "smtp-inactive";
+    body.innerHTML = data.logs.length
+      ? data.logs
+          .map(
+            (log) =>
+              `<tr><td>${new Date(log.timestamp).toLocaleString("en-IN")}</td><td>${log.type === "smtp-test" ? "SMTP Test" : "Docket Email"}</td><td>${log.docketId || "-"}</td><td>${log.recipient || "-"}</td><td><span class="badge ${log.status === "failed" ? "email-failed" : "email-sent"}">${log.status}</span></td><td class="log-detail">${log.error || log.messageId || "-"}</td></tr>`,
+          )
+          .join("")
+      : '<tr><td colspan="6" class="empty">No mail activity recorded yet.</td></tr>';
+  } catch (error) {
+    status.textContent = "Could not load mail service status";
+    status.className = "smtp-inactive";
+    body.innerHTML =
+      '<tr><td colspan="6" class="empty">Mail logs unavailable.</td></tr>';
+  }
+}
+function team() {
+  return `<section class="section-card"><div class="panel-head"><div><h3>Team members</h3><small style="color:var(--muted)">Manage CRM users and role access.</small></div><button class="primary" id="addUser">+ Add User</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email / Login ID</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>${state.team.map((u) => `<tr><td><strong>${u.name}</strong></td><td>${u.email}</td><td>${u.role}</td><td><span class="badge ${u.status === "Inactive" ? "closed" : ""}">${u.status}</span></td><td><button class="outline toggle-user" data-user="${u.id}">${u.status === "Active" ? "Disable" : "Enable"}</button></td></tr>`).join("")}</tbody></table></div></section>`;
+}
+function dialer() {
+  let d = state.dialer;
+  return `<form class="settings-grid" id="dialerForm"><section class="section-card settings-card"><h3>Dialer API connection</h3><p>Connect any HTTP-based dialer provider without changing the CRM interface.</p><div class="field"><label>Provider</label><select name="provider"><option ${d.provider === "Custom API" ? "selected" : ""}>Custom API</option><option ${d.provider === "Exotel" ? "selected" : ""}>Exotel</option><option ${d.provider === "Knowlarity" ? "selected" : ""}>Knowlarity</option><option ${d.provider === "MyOperator" ? "selected" : ""}>MyOperator</option></select></div><div class="field"><label>API Base URL</label><input name="baseUrl" value="${d.baseUrl}" placeholder="https://api.provider.com/v1"></div><div class="field"><label>API Key</label><input name="apiKey" type="password" value="${d.apiKey}" placeholder="Enter API key"></div><button type="button" class="outline" id="testDialer">Test connection</button></section><section class="section-card settings-card"><h3>Call workflow</h3><p>Configure how calls appear against customer dockets.</p><div class="field"><label>Incoming Webhook Path</label><input name="webhookUrl" value="${d.webhookUrl}" readonly></div><div class="toggle-row"><div><strong>Click-to-call</strong><span>Start calls from a docket</span></div><button type="button" class="switch ${d.clickToCall ? "on" : ""}" data-dialer-toggle="clickToCall"></button></div><div class="toggle-row"><div><strong>Automatic call logging</strong><span>Attach call results and duration to docket notes</span></div><button type="button" class="switch ${d.autoLog ? "on" : ""}" data-dialer-toggle="autoLog"></button></div><button class="primary" style="margin-top:20px">Save dialer settings</button></section></form>`;
+}
+function organization() {
+  let b = state.brand;
+  return `<form class="settings-grid" id="organizationForm"><section class="section-card settings-card"><h3>Organization branding</h3><p>Customize this CRM for any company or service business.</p><div class="field"><label>Company / Brand Name</label><input name="name" required value="${b.name}"></div><div class="field"><label>CRM Label</label><input name="label" required value="${b.label}" placeholder="Customer Operations CRM"></div><div class="field"><label>Login Headline</label><input name="headline" required value="${b.headline}"></div></section><section class="section-card settings-card"><h3>Login page message</h3><p>This message introduces the CRM to company users.</p><div class="field"><label>Description</label><textarea name="description" style="min-height:150px">${b.description}</textarea></div><div class="info-box"><b>White-label ready</b><br>Changes apply to the login page, sidebar and browser title. Custom fields can adapt the docket form for any industry.</div><button class="primary">Save organization settings</button></section></form>`;
+}
 
-function logs(){return `<section class="section-card"><div class="panel-head"><div><h3>System & audit logs</h3><small>Server, email, docket and administration activity.</small></div><button class="primary" id="downloadLogs">Download CSV</button></div><div class="toolbar"><input class="search" id="logSearch" placeholder="Search action, user, docket or details"><select id="logStatus"><option value="">All status</option><option value="success">Success</option><option value="failed">Failed</option><option value="info">Info</option></select><button class="outline" id="refreshLogs">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Source</th><th>Action</th><th>User</th><th>Docket</th><th>Status</th><th>Details</th></tr></thead><tbody id="systemLogRows"><tr><td colspan="7" class="empty">Loading system logs...</td></tr></tbody></table></div></section>`}
-let cachedSystemLogs=[];
-const renderSystemLogs=()=>{let body=$('#systemLogRows');if(!body)return;let query=($('#logSearch')?.value||'').toLowerCase(),status=$('#logStatus')?.value||'',items=cachedSystemLogs.filter(log=>(!query||JSON.stringify(log).toLowerCase().includes(query))&&(!status||log.status===status));body.innerHTML=items.length?items.map(log=>`<tr><td>${new Date(log.timestamp).toLocaleString('en-IN')}</td><td>${log.source}</td><td><strong>${log.action}</strong></td><td>${log.user||'System'}<br><small>${log.role||''}</small></td><td>${log.docketId||'-'}</td><td><span class="badge ${log.status==='failed'?'email-failed':log.status==='success'?'email-sent':'pending'}">${log.status}</span></td><td class="log-detail">${log.details||'-'}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">No matching logs found.</td></tr>'};
-async function loadSystemLogs(){try{let [audit,mail]=await Promise.all([fetch('/api/audit').then(r=>r.json()),fetch('/api/mail/logs').then(r=>r.json())]);cachedSystemLogs=[...audit.logs.map(log=>({...log,source:'Audit'})),...mail.logs.map(log=>({...log,source:'Mail',action:log.type==='smtp-test'?'SMTP test':'Docket email',user:'System',role:'Server',details:log.error||log.messageId||''}))].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));renderSystemLogs()}catch(error){$('#systemLogRows').innerHTML='<tr><td colspan="7" class="empty">Could not load server logs.</td></tr>'}}
+function logs() {
+  return `<section class="section-card"><div class="panel-head"><div><h3>System & audit logs</h3><small>Server, email, docket and administration activity.</small></div><button class="primary" id="downloadLogs">Download CSV</button></div><div class="toolbar"><input class="search" id="logSearch" placeholder="Search action, user, docket or details"><select id="logStatus"><option value="">All status</option><option value="success">Success</option><option value="failed">Failed</option><option value="info">Info</option></select><button class="outline" id="refreshLogs">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Source</th><th>Action</th><th>User</th><th>Docket</th><th>Status</th><th>Details</th></tr></thead><tbody id="systemLogRows"><tr><td colspan="7" class="empty">Loading system logs...</td></tr></tbody></table></div></section>`;
+}
+let cachedSystemLogs = [];
+const renderSystemLogs = () => {
+  let body = $("#systemLogRows");
+  if (!body) return;
+  let query = ($("#logSearch")?.value || "").toLowerCase(),
+    status = $("#logStatus")?.value || "",
+    items = cachedSystemLogs.filter(
+      (log) =>
+        (!query || JSON.stringify(log).toLowerCase().includes(query)) &&
+        (!status || log.status === status),
+    );
+  body.innerHTML = items.length
+    ? items
+        .map(
+          (log) =>
+            `<tr><td>${new Date(log.timestamp).toLocaleString("en-IN")}</td><td>${log.source}</td><td><strong>${log.action}</strong></td><td>${log.user || "System"}<br><small>${log.role || ""}</small></td><td>${log.docketId || "-"}</td><td><span class="badge ${log.status === "failed" ? "email-failed" : log.status === "success" ? "email-sent" : "pending"}">${log.status}</span></td><td class="log-detail">${log.details || "-"}</td></tr>`,
+        )
+        .join("")
+    : '<tr><td colspan="7" class="empty">No matching logs found.</td></tr>';
+};
+async function loadSystemLogs() {
+  try {
+    let [audit, mail] = await Promise.all([
+      fetch("/api/audit").then((r) => r.json()),
+      fetch("/api/mail/logs").then((r) => r.json()),
+    ]);
+    cachedSystemLogs = [
+      ...audit.logs.map((log) => ({ ...log, source: "Audit" })),
+      ...mail.logs.map((log) => ({
+        ...log,
+        source: "Mail",
+        action: log.type === "smtp-test" ? "SMTP test" : "Docket email",
+        user: "System",
+        role: "Server",
+        details: log.error || log.messageId || "",
+      })),
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    renderSystemLogs();
+  } catch (error) {
+    $("#systemLogRows").innerHTML =
+      '<tr><td colspan="7" class="empty">Could not load server logs.</td></tr>';
+  }
+}
 
-function profile(){return `<section class="section-card profile-card"><div class="profile-head"><div class="avatar">${session.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</div><div><h3>${session.name}</h3><p>${session.role[0].toUpperCase()+session.role.slice(1)} account - Active</p></div></div><form id="profileForm"><div class="form-grid"><div class="field"><label>Full Name</label><input name="name" value="${session.name}"></div><div class="field"><label>Email Address</label><input value="${session.email}"></div><div class="field"><label>User Role</label><input value="${session.role}" disabled></div><div class="field"><label>Phone Number</label><input placeholder="Add phone number"></div></div><button class="primary">Save changes</button></form></section>`}
-function render(){if(!session){$('#app').innerHTML=loginView();bindLogin();return}let views={dashboard:dashboard(),create:createDocket(),dockets:docketTable(),reports:reports(),logs:logs(),team:team(),fields:fields(),mail:mail(),organization:organization(),dialer:dialer(),profile:profile()};$('#app').innerHTML=shell(views[page]||views.dashboard);bindApp()}
-function bindLogin(){$('#showPass').onclick=()=>{let i=$('#loginPass');i.type=i.type==='password'?'text':'password'};$('#loginForm').onsubmit=e=>{e.preventDefault();let id=$('#loginId').value.trim().toLowerCase(),role=Object.keys(users).find(r=>id===r||id===users[r].email);if(!role||users[role].pass!==$('#loginPass').value)return toast('Incorrect login ID or password');session={role,...users[role]};delete session.pass;sessionStorage.setItem('dsSession',JSON.stringify(session));recordAudit('Login','User signed in');render()}}
-function bindApp(){$$('[data-page]').forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});$('.logout').onclick=()=>{session=null;recordAudit('Logout','User signed out','info');sessionStorage.removeItem('dsSession');page='dashboard';render()};$('.menu-toggle').onclick=()=>{$('.sidebar').classList.add('open');$('.mobile-overlay').classList.add('show')};$('.mobile-overlay').onclick=()=>{$('.sidebar').classList.remove('open');$('.mobile-overlay').classList.remove('show')};if($('.top-search'))$('.top-search').onclick=()=>{page='dockets';render();setTimeout(()=>$('#search')?.focus(),0)};if($('.alert-button'))$('.alert-button').onclick=()=>toast('No new notifications');if($('#quickCreate'))$('#quickCreate').onclick=showQuickDocket;if($('#docketForm'))$('#docketForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target),d=Object.fromEntries(f);d.status='New';d.created=new Date().toISOString().slice(0,10);d.owner=session.role;d.notes=[];state.dockets.unshift(d);save();recordAudit('Docket created',d.name+' - '+d.location,'success',d.id);toast(`Docket ${d.id} created`);sendDocketConfirmation(d);page='dockets';setTimeout(render,650)};if($('#search')){let filter=()=>{let q=$('#search').value.toLowerCase(),s=$('#statusFilter').value,date=$('#dateFilter').value;$('#docketRows').innerHTML=rows(state.dockets.filter(d=>(!q||[d.id,d.name,d.number,d.location].join(' ').toLowerCase().includes(q))&&(!s||d.status===s)&&(!date||d.created===date)));bindDocketButtons()};$('#search').oninput=filter;$('#statusFilter').onchange=filter;$('#dateFilter').onchange=filter;$('#clearFilter').onclick=()=>{$('#search').value='';$('#statusFilter').value='';$('#dateFilter').value='';filter()};bindDocketButtons()}if($('#systemLogRows')){loadSystemLogs();$('#refreshLogs').onclick=loadSystemLogs;$('#logSearch').oninput=renderSystemLogs;$('#logStatus').onchange=renderSystemLogs;$('#downloadLogs').onclick=()=>{let headers=['Time','Source','Action','User','Role','Docket','Status','Details'],rows=cachedSystemLogs.map(log=>[log.timestamp,log.source,log.action,log.user||'System',log.role||'',log.docketId||'',log.status,log.details||'']),escape=value=>'"'+String(value||'').replaceAll('"','""')+'"',csv=[headers,...rows].map(row=>row.map(escape).join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='dhruv-setu-system-logs.csv';a.click();URL.revokeObjectURL(a.href)}}if($('#downloadReport'))$('#downloadReport').onclick=()=>{let custom=reportFields(),headers=['Docket ID','Customer','Mobile','Email','Destination','Query','Remarks',...custom.map(field=>field.label),'Status','Created'],records=state.dockets.map(docket=>[docket.id,docket.name,docket.number,docket.email,docket.location,docket.query,docket.remark,...custom.map(field=>reportFieldValue(docket,field)),docket.status,docket.created]),escape=value=>`"${String(value||'').replaceAll('"','""')}"`,csv=[headers,...records].map(row=>row.map(escape).join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='dhruv-setu-report.csv';a.click();URL.revokeObjectURL(a.href);toast(`Report downloaded with ${custom.length} custom fields`)};if($('#reportPermission'))$('#reportPermission').onclick=()=>{state.reportsAllowed=!state.reportsAllowed;save();render();toast('Support permission updated')};if($('#mailLogRows')){loadMailLogs();if($('#refreshMailLogs'))$('#refreshMailLogs').onclick=loadMailLogs}if($('#smtpForm')){let form=$('#smtpForm'),provider=$('#mailProvider'),host=$('#smtpForm [name="host"]'),port=$('#smtpForm [name="port"]'),security=$('#smtpForm [name="security"]'),hint=$('#providerHint'),result=$('#mailTestResult'),presets={'Gmail':{host:'smtp.gmail.com',port:'587',security:'STARTTLS',hint:'Use your full Gmail address and a Google App Password.'},'Microsoft 365 / Outlook':{host:'smtp.office365.com',port:'587',security:'STARTTLS',hint:'Your Microsoft administrator may need to enable Authenticated SMTP.'},'Zoho Mail':{host:'smtp.zoho.com',port:'587',security:'STARTTLS',hint:'Use an app-specific password. Regional accounts may need a regional host.'},'SendGrid':{host:'smtp.sendgrid.net',port:'587',security:'STARTTLS',hint:'Use apikey as username and the API key as password.'},'Mailgun':{host:'smtp.mailgun.org',port:'587',security:'STARTTLS',hint:'Use SMTP credentials for your Mailgun domain.'},'Amazon SES':{host:'',port:'587',security:'STARTTLS',hint:'Enter your regional SES endpoint and SMTP credentials.'},'Custom SMTP':{host:'',port:'587',security:'STARTTLS',hint:'Enter details supplied by your email host.'}};let showHint=()=>hint.textContent=presets[provider.value]?.hint||'';showHint();provider.onchange=()=>{let p=presets[provider.value];host.value=p.host;port.value=p.port;security.value=p.security;showHint()};port.onchange=()=>{if(port.value==='587')security.value='STARTTLS';if(port.value==='465')security.value='SSL/TLS'};form.onsubmit=async event=>{event.preventDefault();if(!form.reportValidity())return;let button=$('#saveSmtp'),data=Object.fromEntries(new FormData(form));data.password=$('#mailPassword').value;button.disabled=true;button.textContent='Verifying & Saving...';try{let response=await fetch('/api/mail/config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)}),payload=await response.json();if(!payload.ok)throw new Error(payload.error);let saved={...data};delete saved.password;state.mail={...state.mail,...saved};save();result.textContent='SMTP configuration verified, encrypted and saved.';result.className='mail-test-result success';recordAudit('SMTP configuration saved',data.provider);loadMailLogs();toast('SMTP configuration saved')}catch(error){result.textContent=error.message;result.className='mail-test-result error';toast('SMTP configuration failed')}finally{button.disabled=false;button.textContent='Save SMTP Configuration'}};$('#testMail').onclick=async()=>{let recipient=$('#testRecipient').value;if(!recipient){result.textContent='Enter a test recipient email.';result.className='mail-test-result error';return}let data=Object.fromEntries(new FormData(form));data.password=$('#mailPassword').value;data.recipient=recipient;let button=$('#testMail');button.disabled=true;button.textContent='Sending test...';try{let response=await fetch('/api/mail/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)}),payload=await response.json();if(!payload.ok)throw new Error(payload.error);result.textContent='SMTP verified. Test email sent successfully.';result.className='mail-test-result success';loadMailLogs();toast('Test email sent successfully')}catch(error){result.textContent=error.message;result.className='mail-test-result error';toast('SMTP test failed')}finally{button.disabled=false;button.textContent='Test SMTP & Send Email'}}}if($('#templateForm'))$('#templateForm').onsubmit=event=>{event.preventDefault();state.mail={...state.mail,...Object.fromEntries(new FormData(event.target))};save();let result=$('#templateSaveResult');result.textContent='Email template saved in this CRM.';result.className='mail-test-result success';recordAudit('Email template saved','Docket confirmation template');toast('Email template saved')};if($('#addUser'))$('#addUser').onclick=showUserModal;$$('.toggle-user').forEach(b=>b.onclick=()=>{let u=state.team.find(x=>x.id==b.dataset.user);u.status=u.status==='Active'?'Inactive':'Active';save();render();toast('User access updated')});if($('#dialerForm'))$('#dialerForm').onsubmit=e=>{e.preventDefault();state.dialer={...state.dialer,...Object.fromEntries(new FormData(e.target))};save();toast('Dialer settings saved')};$$('[data-dialer-toggle]').forEach(b=>b.onclick=()=>{let k=b.dataset.dialerToggle;state.dialer[k]=!state.dialer[k];save();render()});if($('#testDialer'))$('#testDialer').onclick=()=>toast(state.dialer.baseUrl?'Connection test queued':'Enter an API Base URL first');if($('#organizationForm'))$('#organizationForm').onsubmit=e=>{e.preventDefault();state.brand={...state.brand,...Object.fromEntries(new FormData(e.target))};document.title=state.brand.name+' CRM';save();toast('Organization branding updated');render()};if($('#profileForm'))$('#profileForm').onsubmit=e=>{e.preventDefault();session.name=new FormData(e.target).get('name');sessionStorage.setItem('dsSession',JSON.stringify(session));toast('Profile updated');render()}}
-async function sendDocketConfirmation(docket){docket.emailStatus='Sending';save();try{let response=await fetch('/api/mail/send-docket',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...docket,subject:state.mail.subject,body:state.mail.body})}),payload=await response.json();if(!payload.ok)throw new Error(payload.error);docket.emailStatus='Sent';docket.emailError='';save();recordAudit('Confirmation email sent',docket.email,'success',docket.id);if(page==='dockets')render();toast('Confirmation email sent to '+docket.email);return true}catch(error){docket.emailStatus='Failed';docket.emailError=error.message;save();recordAudit('Confirmation email failed',error.message,'failed',docket.id);if(page==='dockets')render();toast('Email failed - check Mail Delivery Logs');return false}}
-function showQuickDocket(){let id=`DS-${new Date().toISOString().slice(2,10).replaceAll('-','')}-${String(Math.floor(1000+Math.random()*9000))}`;document.body.insertAdjacentHTML('beforeend',`<div class="modal-wrap"><form class="modal quick-docket-modal" id="quickDocketForm"><div class="modal-head"><div><span class="modal-kicker">Quick create</span><h3>Create a new docket</h3><small>Reference: ${id}</small></div><button type="button" class="close">x</button></div><div class="form-grid"><div class="field"><label>Mobile Number *</label><input name="number" required maxlength="15" placeholder="Customer mobile number"></div><div class="field"><label>Customer Name *</label><input name="name" required placeholder="Full name"></div><div class="field"><label>Email Address *</label><input name="email" type="email" required placeholder="customer@email.com"></div><div class="field"><label>Location / Service Area *</label><input name="location" required placeholder="Customer location"></div><div class="field span-2"><label>Address</label><textarea name="address" placeholder="Complete address"></textarea></div><div class="field span-2"><label>Query / Requirement *</label><textarea name="query" required placeholder="Describe the customer request"></textarea></div><div class="field span-2"><label>Remarks</label><textarea name="remark" placeholder="Internal remarks"></textarea></div>${state.fields.filter(field=>field.enabled).map(field=>`<div class="field ${field.type==='Checkbox'?'':'span-2'}"><label>${field.label}</label>${field.type==='Dropdown'?`<select name="field_${field.id}"><option value="">Select an option</option>${field.options.split(',').map(option=>`<option>${option.trim()}</option>`).join('')}</select>`:`<label class="quick-check"><input type="checkbox" name="field_${field.id}"> Yes</label>`}</div>`).join('')}</div><input type="hidden" name="id" value="${id}"><div class="modal-actions"><button type="button" class="outline cancel-quick">Cancel</button><button class="primary">Create Docket & Send Email</button></div></form></div>`);let wrap=$('.modal-wrap');wrap.querySelector('.close').onclick=()=>wrap.remove();wrap.querySelector('.cancel-quick').onclick=()=>wrap.remove();wrap.onclick=event=>{if(event.target===wrap)wrap.remove()};$('#quickDocketForm').onsubmit=event=>{event.preventDefault();let docket=Object.fromEntries(new FormData(event.target));docket.status='New';docket.created=new Date().toISOString().slice(0,10);docket.owner=session.role;docket.notes=[];state.dockets.unshift(docket);save();recordAudit('Docket created',docket.name+' - '+docket.location,'success',docket.id);wrap.remove();toast(`Docket ${docket.id} created`);sendDocketConfirmation(docket);page='dockets';render()}}
-function bindDocketButtons(){$$('.view-docket').forEach(b=>b.onclick=()=>showDocket(b.dataset.id))}
-function showDocket(id){let d=state.dockets.find(x=>x.id===id);document.body.insertAdjacentHTML('beforeend',`<div class="modal-wrap"><div class="modal docket-modal"><div class="modal-head"><div><h3>${d.id}</h3><small>${d.name} - ${d.location}</small></div><button type="button" class="close">x</button></div><div class="detail-grid"><div><span>Mobile</span><strong>${d.number}</strong></div><div><span>Email</span><strong>${d.email}</strong></div><div><span>Address</span><strong>${d.address||'Not provided'}</strong></div><div><span>Created</span><strong>${d.created}</strong></div></div><div class="info-box"><b>Customer query</b><br>${d.query}<br><br><b>Remarks</b><br>${d.remark||'No remarks'}</div><form id="docketUpdate"><div class="field"><label>Status</label><select name="status"><option ${d.status==='New'?'selected':''}>New</option><option ${d.status==='In Progress'?'selected':''}>In Progress</option><option ${d.status==='Closed'?'selected':''}>Closed</option></select></div><div class="field"><label>Add internal note</label><textarea name="note" placeholder="Add follow-up, call result or booking update..."></textarea></div><div class="notes-list">${d.notes.length?d.notes.slice().reverse().map(n=>`<div class="note"><strong>${n.author}</strong><span>${n.date}</span><p>${n.text}</p></div>`).join(''):'<small>No internal notes yet.</small>'}</div><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" class="outline call-customer">Call Call customer</button><button class="primary">Save update</button></div></form></div></div>`);$('.close').onclick=()=>$('.modal-wrap').remove();$('.call-customer').onclick=()=>toast(state.dialer.clickToCall?'Call request queued':'Click-to-call is disabled');$('#docketUpdate').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);d.status=f.get('status');let note=f.get('note').trim();if(note)d.notes.push({text:note,author:session.name,date:new Date().toLocaleString('en-IN')});save();$('.modal-wrap').remove();toast('Docket updated');render()}}
-function showUserModal(){document.body.insertAdjacentHTML('beforeend',`<div class="modal-wrap"><form class="modal" id="userForm"><div class="modal-head"><h3>Add team member</h3><button type="button" class="close">x</button></div><div class="field"><label>Full Name</label><input name="name" required></div><div class="field"><label>Email / Login ID</label><input name="email" type="email" required></div><div class="field"><label>Role</label><select name="role"><option>User</option><option>Support</option><option>Admin</option></select></div><div class="field"><label>Temporary Password</label><input name="password" type="password" required minlength="6"></div><button class="primary full">Create User</button></form></div>`);$('.close').onclick=()=>$('.modal-wrap').remove();$('#userForm').onsubmit=e=>{e.preventDefault();let f=Object.fromEntries(new FormData(e.target));state.team.push({id:Date.now(),name:f.name,email:f.email,role:f.role,status:'Active'});save();$('.modal-wrap').remove();toast('Team member created');render()}}
-function showFieldModal(editId){let existing=state.fields.find(f=>f.id===editId);document.body.insertAdjacentHTML('beforeend',`<div class="modal-wrap"><form class="modal" id="fieldForm"><div class="modal-head"><h3>${existing?'Edit':'Add'} custom field</h3><button type="button" class="close">x</button></div><div class="field"><label>Field Label</label><input name="label" required placeholder="e.g. Preferred city" value="${existing?.label||''}"></div><div class="field"><label>Field Type</label><select name="type" id="fieldType"><option ${existing?.type==='Dropdown'?'selected':''}>Dropdown</option><option ${existing?.type==='Checkbox'?'selected':''}>Checkbox</option></select></div><div class="field ${existing?.type==='Checkbox'?'hidden':''}" id="optionsField"><label>Options (comma separated)</label><input name="options" placeholder="Goa, Manali, Jaipur" value="${existing?.options||''}"></div><button class="primary full">${existing?'Save changes':'Add field'}</button></form></div>`);$('.close').onclick=()=>$('.modal-wrap').remove();$('#fieldType').onchange=e=>$('#optionsField').classList.toggle('hidden',e.target.value==='Checkbox');$('#fieldForm').onsubmit=e=>{e.preventDefault();let values=Object.fromEntries(new FormData(e.target));if(values.type==='Checkbox')values.options='';if(existing)Object.assign(existing,values);else state.fields.push({id:Date.now(),...values,enabled:true});save();recordAudit(existing?'Custom field updated':'Custom field created',values.label);$('.modal-wrap').remove();toast(existing?'Custom field updated':'Custom field added');render()}}
+function profile() {
+  return `<section class="section-card profile-card"><div class="profile-head"><div class="avatar">${session.name
+    .split(" ")
+    .map((x) => x[0])
+    .join("")
+    .slice(
+      0,
+      2,
+    )}</div><div><h3>${session.name}</h3><p>${session.role[0].toUpperCase() + session.role.slice(1)} account - Active</p></div></div><form id="profileForm"><div class="form-grid"><div class="field"><label>Full Name</label><input name="name" value="${session.name}"></div><div class="field"><label>Email Address</label><input value="${session.email}"></div><div class="field"><label>User Role</label><input value="${session.role}" disabled></div><div class="field"><label>Phone Number</label><input placeholder="Add phone number"></div></div><button class="primary">Save changes</button></form></section>`;
+}
+function render() {
+  if (!session) {
+    $("#app").innerHTML = loginView();
+    bindLogin();
+    return;
+  }
+  let views = {
+    dashboard: dashboard(),
+    create: createDocket(),
+    dockets: docketTable(),
+    reports: reports(),
+    logs: logs(),
+    team: team(),
+    fields: fields(),
+    mail: mail(),
+    organization: organization(),
+    dialer: dialer(),
+    profile: profile(),
+  };
+  $("#app").innerHTML = shell(views[page] || views.dashboard);
+  bindApp();
+}
+function bindLogin() {
+  $("#showPass").onclick = () => {
+    let i = $("#loginPass");
+    i.type = i.type === "password" ? "text" : "password";
+  };
+  $("#loginForm").onsubmit = async (e) => {
+    e.preventDefault();
+    let button = e.submitter;
+    button.disabled = true;
+    try {
+      let payload = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          login: $("#loginId").value.trim(),
+          password: $("#loginPass").value,
+        }),
+      });
+      session = payload.user;
+      await loadWorkspace();
+      render();
+    } catch (error) {
+      toast(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+function bindApp() {
+  $$("[data-page]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        page = b.dataset.page;
+        render();
+      }),
+  );
+  $(".logout").onclick = async () => {
+    try { await api("/api/auth/logout", { method: "POST" }); } catch {}
+    session = null;
+    page = "dashboard";
+    render();
+  };
+  $(".menu-toggle").onclick = () => {
+    $(".sidebar").classList.add("open");
+    $(".mobile-overlay").classList.add("show");
+  };
+  $(".mobile-overlay").onclick = () => {
+    $(".sidebar").classList.remove("open");
+    $(".mobile-overlay").classList.remove("show");
+  };
+  if ($(".top-search"))
+    $(".top-search").onclick = () => {
+      page = "dockets";
+      render();
+      setTimeout(() => $("#search")?.focus(), 0);
+    };
+  if ($(".alert-button"))
+    $(".alert-button").onclick = () => toast("No new notifications");
+  if ($("#quickCreate")) $("#quickCreate").onclick = showQuickDocket;
+  if ($("#docketForm"))
+    $("#docketForm").onsubmit = async (e) => {
+      e.preventDefault();
+      let f = new FormData(e.target),
+        d = Object.fromEntries(f);
+      let button = e.submitter;
+      button.disabled = true;
+      try {
+        let payload = await api("/api/dockets", { method: "POST", body: JSON.stringify(d) });
+        d = payload.docket;
+        state.dockets.unshift(d);
+        save();
+        toast(`Docket ${d.id} created`);
+        sendDocketConfirmation(d);
+        page = "dockets";
+        render();
+      } catch (error) { toast(error.message); }
+      finally { button.disabled = false; }
+    };
+  if ($("#search")) {
+    let filter = () => {
+      let q = $("#search").value.toLowerCase(),
+        s = $("#statusFilter").value,
+        date = $("#dateFilter").value;
+      $("#docketRows").innerHTML = rows(
+        state.dockets.filter(
+          (d) =>
+            (!q ||
+              [d.id, d.name, d.number, d.location]
+                .join(" ")
+                .toLowerCase()
+                .includes(q)) &&
+            (!s || d.status === s) &&
+            (!date || d.created === date),
+        ),
+      );
+      bindDocketButtons();
+    };
+    $("#search").oninput = filter;
+    $("#statusFilter").onchange = filter;
+    $("#dateFilter").onchange = filter;
+    $("#clearFilter").onclick = () => {
+      $("#search").value = "";
+      $("#statusFilter").value = "";
+      $("#dateFilter").value = "";
+      filter();
+    };
+    bindDocketButtons();
+  }
+  if ($("#systemLogRows")) {
+    loadSystemLogs();
+    $("#refreshLogs").onclick = loadSystemLogs;
+    $("#logSearch").oninput = renderSystemLogs;
+    $("#logStatus").onchange = renderSystemLogs;
+    $("#downloadLogs").onclick = () => {
+      let headers = [
+          "Time",
+          "Source",
+          "Action",
+          "User",
+          "Role",
+          "Docket",
+          "Status",
+          "Details",
+        ],
+        rows = cachedSystemLogs.map((log) => [
+          log.timestamp,
+          log.source,
+          log.action,
+          log.user || "System",
+          log.role || "",
+          log.docketId || "",
+          log.status,
+          log.details || "",
+        ]),
+        escape = (value) =>
+          '"' + String(value || "").replaceAll('"', '""') + '"',
+        csv = [headers, ...rows]
+          .map((row) => row.map(escape).join(","))
+          .join("\n"),
+        a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "dhruv-setu-system-logs.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+  }
+  if ($("#downloadReport"))
+    $("#downloadReport").onclick = () => {
+      let custom = reportFields(),
+        headers = [
+          "Docket ID",
+          "Customer",
+          "Mobile",
+          "Email",
+          "Destination",
+          "Query",
+          "Remarks",
+          ...custom.map((field) => field.label),
+          "Status",
+          "Created",
+        ],
+        records = state.dockets.map((docket) => [
+          docket.id,
+          docket.name,
+          docket.number,
+          docket.email,
+          docket.location,
+          docket.query,
+          docket.remark,
+          ...custom.map((field) => reportFieldValue(docket, field)),
+          docket.status,
+          docket.created,
+        ]),
+        escape = (value) => `"${String(value || "").replaceAll('"', '""')}"`,
+        csv = [headers, ...records]
+          .map((row) => row.map(escape).join(","))
+          .join("\n"),
+        a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "dhruv-setu-report.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast(`Report downloaded with ${custom.length} custom fields`);
+    };
+  if ($("#reportPermission"))
+    $("#reportPermission").onclick = () => {
+      state.reportsAllowed = !state.reportsAllowed;
+      save();
+      render();
+      toast("Support permission updated");
+    };
+  if ($("#mailLogRows")) {
+    loadMailLogs();
+    if ($("#refreshMailLogs")) $("#refreshMailLogs").onclick = loadMailLogs;
+  }
+  if ($("#smtpForm")) {
+    let form = $("#smtpForm"),
+      provider = $("#mailProvider"),
+      host = $('#smtpForm [name="host"]'),
+      port = $('#smtpForm [name="port"]'),
+      security = $('#smtpForm [name="security"]'),
+      hint = $("#providerHint"),
+      result = $("#mailTestResult"),
+      presets = {
+        Gmail: {
+          host: "smtp.gmail.com",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Use your full Gmail address and a Google App Password.",
+        },
+        "Microsoft 365 / Outlook": {
+          host: "smtp.office365.com",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Your Microsoft administrator may need to enable Authenticated SMTP.",
+        },
+        "Zoho Mail": {
+          host: "smtp.zoho.com",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Use an app-specific password. Regional accounts may need a regional host.",
+        },
+        SendGrid: {
+          host: "smtp.sendgrid.net",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Use apikey as username and the API key as password.",
+        },
+        Mailgun: {
+          host: "smtp.mailgun.org",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Use SMTP credentials for your Mailgun domain.",
+        },
+        "Amazon SES": {
+          host: "",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Enter your regional SES endpoint and SMTP credentials.",
+        },
+        "Custom SMTP": {
+          host: "",
+          port: "587",
+          security: "STARTTLS",
+          hint: "Enter details supplied by your email host.",
+        },
+      };
+    let showHint = () =>
+      (hint.textContent = presets[provider.value]?.hint || "");
+    showHint();
+    provider.onchange = () => {
+      let p = presets[provider.value];
+      host.value = p.host;
+      port.value = p.port;
+      security.value = p.security;
+      showHint();
+    };
+    port.onchange = () => {
+      if (port.value === "587") security.value = "STARTTLS";
+      if (port.value === "465") security.value = "SSL/TLS";
+    };
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      let button = $("#saveSmtp"),
+        data = Object.fromEntries(new FormData(form));
+      data.password = $("#mailPassword").value;
+      button.disabled = true;
+      button.textContent = "Verifying & Saving...";
+      try {
+        let response = await fetch("/api/mail/config", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(data),
+          }),
+          payload = await response.json();
+        if (!payload.ok) throw new Error(payload.error);
+        let saved = { ...data };
+        delete saved.password;
+        state.mail = { ...state.mail, ...saved };
+        save();
+        result.textContent =
+          "SMTP configuration verified, encrypted and saved.";
+        result.className = "mail-test-result success";
+        recordAudit("SMTP configuration saved", data.provider);
+        loadMailLogs();
+        toast("SMTP configuration saved");
+      } catch (error) {
+        result.textContent = error.message;
+        result.className = "mail-test-result error";
+        toast("SMTP configuration failed");
+      } finally {
+        button.disabled = false;
+        button.textContent = "Save SMTP Configuration";
+      }
+    };
+    $("#testMail").onclick = async () => {
+      let recipient = $("#testRecipient").value;
+      if (!recipient) {
+        result.textContent = "Enter a test recipient email.";
+        result.className = "mail-test-result error";
+        return;
+      }
+      let data = Object.fromEntries(new FormData(form));
+      data.password = $("#mailPassword").value;
+      data.recipient = recipient;
+      let button = $("#testMail");
+      button.disabled = true;
+      button.textContent = "Sending test...";
+      try {
+        let response = await fetch("/api/mail/test", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(data),
+          }),
+          payload = await response.json();
+        if (!payload.ok) throw new Error(payload.error);
+        result.textContent = "SMTP verified. Test email sent successfully.";
+        result.className = "mail-test-result success";
+        loadMailLogs();
+        toast("Test email sent successfully");
+      } catch (error) {
+        result.textContent = error.message;
+        result.className = "mail-test-result error";
+        toast("SMTP test failed");
+      } finally {
+        button.disabled = false;
+        button.textContent = "Test SMTP & Send Email";
+      }
+    };
+  }
+  if ($("#templateForm"))
+    $("#templateForm").onsubmit = (event) => {
+      event.preventDefault();
+      state.mail = {
+        ...state.mail,
+        ...Object.fromEntries(new FormData(event.target)),
+      };
+      save();
+      let result = $("#templateSaveResult");
+      result.textContent = "Email template saved in this CRM.";
+      result.className = "mail-test-result success";
+      recordAudit("Email template saved", "Docket confirmation template");
+      toast("Email template saved");
+    };
+  if ($("#addUser")) $("#addUser").onclick = showUserModal;
+  $$(".toggle-user").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let u = state.team.find((x) => x.id == b.dataset.user);
+        u.status = u.status === "Active" ? "Inactive" : "Active";
+        save();
+        render();
+        toast("User access updated");
+      }),
+  );
+  if ($("#dialerForm"))
+    $("#dialerForm").onsubmit = (e) => {
+      e.preventDefault();
+      state.dialer = {
+        ...state.dialer,
+        ...Object.fromEntries(new FormData(e.target)),
+      };
+      save();
+      toast("Dialer settings saved");
+    };
+  $$("[data-dialer-toggle]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let k = b.dataset.dialerToggle;
+        state.dialer[k] = !state.dialer[k];
+        save();
+        render();
+      }),
+  );
+  if ($("#testDialer"))
+    $("#testDialer").onclick = () =>
+      toast(
+        state.dialer.baseUrl
+          ? "Connection test queued"
+          : "Enter an API Base URL first",
+      );
+  if ($("#organizationForm"))
+    $("#organizationForm").onsubmit = (e) => {
+      e.preventDefault();
+      state.brand = {
+        ...state.brand,
+        ...Object.fromEntries(new FormData(e.target)),
+      };
+      document.title = state.brand.name + " CRM";
+      save();
+      toast("Organization branding updated");
+      render();
+    };
+  if ($("#profileForm"))
+    $("#profileForm").onsubmit = (e) => {
+      e.preventDefault();
+      session.name = new FormData(e.target).get("name");
+      sessionStorage.setItem("dsSession", JSON.stringify(session));
+      toast("Profile updated");
+      render();
+    };
+}
+async function sendDocketConfirmation(docket) {
+  docket.emailStatus = "Sending";
+  save();
+  try {
+    let response = await fetch("/api/mail/send-docket", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...docket,
+          subject: state.mail.subject,
+          body: state.mail.body,
+        }),
+      }),
+      payload = await response.json();
+    if (!payload.ok) throw new Error(payload.error);
+    docket.emailStatus = "Sent";
+    docket.emailError = "";
+    save();
+    recordAudit("Confirmation email sent", docket.email, "success", docket.id);
+    if (page === "dockets") render();
+    toast("Confirmation email sent to " + docket.email);
+    return true;
+  } catch (error) {
+    docket.emailStatus = "Failed";
+    docket.emailError = error.message;
+    save();
+    recordAudit(
+      "Confirmation email failed",
+      error.message,
+      "failed",
+      docket.id,
+    );
+    if (page === "dockets") render();
+    toast("Email failed - check Mail Delivery Logs");
+    return false;
+  }
+}
+function showQuickDocket() {
+  let id = `DS-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${String(Math.floor(1000 + Math.random() * 9000))}`;
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<div class="modal-wrap"><form class="modal quick-docket-modal" id="quickDocketForm"><div class="modal-head"><div><span class="modal-kicker">Quick create</span><h3>Create a new docket</h3><small>Reference: ${id}</small></div><button type="button" class="close">x</button></div><div class="form-grid"><div class="field"><label>Mobile Number *</label><input name="number" required maxlength="15" placeholder="Customer mobile number"></div><div class="field"><label>Customer Name *</label><input name="name" required placeholder="Full name"></div><div class="field"><label>Email Address *</label><input name="email" type="email" required placeholder="customer@email.com"></div><div class="field"><label>Location / Service Area *</label><input name="location" required placeholder="Customer location"></div><div class="field span-2"><label>Address</label><textarea name="address" placeholder="Complete address"></textarea></div><div class="field span-2"><label>Query / Requirement *</label><textarea name="query" required placeholder="Describe the customer request"></textarea></div><div class="field span-2"><label>Remarks</label><textarea name="remark" placeholder="Internal remarks"></textarea></div>${state.fields
+      .filter((field) => field.enabled)
+      .map(
+        (field) =>
+          `<div class="field ${field.type === "Checkbox" ? "" : "span-2"}"><label>${field.label}</label>${
+            field.type === "Dropdown"
+              ? `<select name="field_${field.id}"><option value="">Select an option</option>${field.options
+                  .split(",")
+                  .map((option) => `<option>${option.trim()}</option>`)
+                  .join("")}</select>`
+              : `<label class="quick-check"><input type="checkbox" name="field_${field.id}"> Yes</label>`
+          }</div>`,
+      )
+      .join(
+        "",
+      )}</div><input type="hidden" name="id" value="${id}"><div class="modal-actions"><button type="button" class="outline cancel-quick">Cancel</button><button class="primary">Create Docket & Send Email</button></div></form></div>`,
+  );
+  let wrap = $(".modal-wrap");
+  wrap.querySelector(".close").onclick = () => wrap.remove();
+  wrap.querySelector(".cancel-quick").onclick = () => wrap.remove();
+  wrap.onclick = (event) => {
+    if (event.target === wrap) wrap.remove();
+  };
+  $("#quickDocketForm").onsubmit = async (event) => {
+    event.preventDefault();
+    let docket = Object.fromEntries(new FormData(event.target));
+    let button = event.submitter;
+    button.disabled = true;
+    try {
+      let payload = await api("/api/dockets", { method: "POST", body: JSON.stringify(docket) });
+      docket = payload.docket;
+      state.dockets.unshift(docket);
+      save();
+      wrap.remove();
+      toast(`Docket ${docket.id} created`);
+      sendDocketConfirmation(docket);
+      page = "dockets";
+      render();
+    } catch (error) { toast(error.message); }
+    finally { button.disabled = false; }
+  };
+}
+function bindDocketButtons() {
+  $$(".view-docket").forEach(
+    (b) => (b.onclick = () => showDocket(b.dataset.id)),
+  );
+}
+function showDocket(id) {
+  let d = state.dockets.find((x) => x.id === id);
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<div class="modal-wrap"><div class="modal docket-modal"><div class="modal-head"><div><h3>${d.id}</h3><small>${d.name} - ${d.location}</small></div><button type="button" class="close">x</button></div><div class="detail-grid"><div><span>Mobile</span><strong>${d.number}</strong></div><div><span>Email</span><strong>${d.email}</strong></div><div><span>Address</span><strong>${d.address || "Not provided"}</strong></div><div><span>Created</span><strong>${d.created}</strong></div></div><div class="info-box"><b>Customer query</b><br>${d.query}<br><br><b>Remarks</b><br>${d.remark || "No remarks"}</div><form id="docketUpdate"><div class="field"><label>Status</label><select name="status"><option ${d.status === "New" ? "selected" : ""}>New</option><option ${d.status === "In Progress" ? "selected" : ""}>In Progress</option><option ${d.status === "Closed" ? "selected" : ""}>Closed</option></select></div><div class="field"><label>Add internal note</label><textarea name="note" placeholder="Add follow-up, call result or booking update..."></textarea></div><div class="notes-list">${
+      d.notes.length
+        ? d.notes
+            .slice()
+            .reverse()
+            .map(
+              (n) =>
+                `<div class="note"><strong>${n.author}</strong><span>${n.date}</span><p>${n.text}</p></div>`,
+            )
+            .join("")
+        : "<small>No internal notes yet.</small>"
+    }</div><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" class="outline call-customer">Call Call customer</button><button class="primary">Save update</button></div></form></div></div>`,
+  );
+  $(".close").onclick = () => $(".modal-wrap").remove();
+  $(".call-customer").onclick = () =>
+    toast(
+      state.dialer.clickToCall
+        ? "Call request queued"
+        : "Click-to-call is disabled",
+    );
+  $("#docketUpdate").onsubmit = (e) => {
+    e.preventDefault();
+    let f = new FormData(e.target);
+    d.status = f.get("status");
+    let note = f.get("note").trim();
+    if (note)
+      d.notes.push({
+        text: note,
+        author: session.name,
+        date: new Date().toLocaleString("en-IN"),
+      });
+    save();
+    $(".modal-wrap").remove();
+    toast("Docket updated");
+    render();
+  };
+}
+function showUserModal() {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<div class="modal-wrap"><form class="modal" id="userForm"><div class="modal-head"><h3>Add team member</h3><button type="button" class="close">x</button></div><div class="field"><label>Full Name</label><input name="name" required></div><div class="field"><label>Email / Login ID</label><input name="email" type="email" required></div><div class="field"><label>Role</label><select name="role"><option>User</option><option>Support</option><option>Admin</option></select></div><div class="field"><label>Temporary Password</label><input name="password" type="password" required minlength="6"></div><button class="primary full">Create User</button></form></div>`,
+  );
+  $(".close").onclick = () => $(".modal-wrap").remove();
+  $("#userForm").onsubmit = (e) => {
+    e.preventDefault();
+    let f = Object.fromEntries(new FormData(e.target));
+    state.team.push({
+      id: Date.now(),
+      name: f.name,
+      email: f.email,
+      role: f.role,
+      status: "Active",
+    });
+    save();
+    $(".modal-wrap").remove();
+    toast("Team member created");
+    render();
+  };
+}
+function showFieldModal(editId) {
+  let existing = state.fields.find((f) => f.id === editId);
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<div class="modal-wrap"><form class="modal" id="fieldForm"><div class="modal-head"><h3>${existing ? "Edit" : "Add"} custom field</h3><button type="button" class="close">x</button></div><div class="field"><label>Field Label</label><input name="label" required placeholder="e.g. Preferred city" value="${existing?.label || ""}"></div><div class="field"><label>Field Type</label><select name="type" id="fieldType"><option ${existing?.type === "Dropdown" ? "selected" : ""}>Dropdown</option><option ${existing?.type === "Checkbox" ? "selected" : ""}>Checkbox</option></select></div><div class="field ${existing?.type === "Checkbox" ? "hidden" : ""}" id="optionsField"><label>Options (comma separated)</label><input name="options" placeholder="Goa, Manali, Jaipur" value="${existing?.options || ""}"></div><button class="primary full">${existing ? "Save changes" : "Add field"}</button></form></div>`,
+  );
+  $(".close").onclick = () => $(".modal-wrap").remove();
+  $("#fieldType").onchange = (e) =>
+    $("#optionsField").classList.toggle(
+      "hidden",
+      e.target.value === "Checkbox",
+    );
+  $("#fieldForm").onsubmit = (e) => {
+    e.preventDefault();
+    let values = Object.fromEntries(new FormData(e.target));
+    if (values.type === "Checkbox") values.options = "";
+    if (existing) Object.assign(existing, values);
+    else state.fields.push({ id: Date.now(), ...values, enabled: true });
+    save();
+    recordAudit(
+      existing ? "Custom field updated" : "Custom field created",
+      values.label,
+    );
+    $(".modal-wrap").remove();
+    toast(existing ? "Custom field updated" : "Custom field added");
+    render();
+  };
+}
 
-document.addEventListener('click',event=>{
-  const add=event.target.closest('#addField');
-  const edit=event.target.closest('[data-edit-field]');
-  const toggle=event.target.closest('[data-toggle-field]');
-  const remove=event.target.closest('[data-delete-field]');
-  if(add){event.preventDefault();showFieldModal();return}
-  if(edit){event.preventDefault();showFieldModal(Number(edit.dataset.editField));return}
-  if(toggle){event.preventDefault();let field=state.fields.find(item=>String(item.id)===toggle.dataset.toggleField);if(!field)return;field.enabled=!field.enabled;save();render();toast(field.enabled?'Field enabled':'Field disabled');return}
-  if(remove){event.preventDefault();state.fields=state.fields.filter(item=>String(item.id)!==remove.dataset.deleteField);save();render();toast('Custom field deleted')}
+document.addEventListener("click", (event) => {
+  const add = event.target.closest("#addField");
+  const edit = event.target.closest("[data-edit-field]");
+  const toggle = event.target.closest("[data-toggle-field]");
+  const remove = event.target.closest("[data-delete-field]");
+  if (add) {
+    event.preventDefault();
+    showFieldModal();
+    return;
+  }
+  if (edit) {
+    event.preventDefault();
+    showFieldModal(Number(edit.dataset.editField));
+    return;
+  }
+  if (toggle) {
+    event.preventDefault();
+    let field = state.fields.find(
+      (item) => String(item.id) === toggle.dataset.toggleField,
+    );
+    if (!field) return;
+    field.enabled = !field.enabled;
+    save();
+    render();
+    toast(field.enabled ? "Field enabled" : "Field disabled");
+    return;
+  }
+  if (remove) {
+    event.preventDefault();
+    state.fields = state.fields.filter(
+      (item) => String(item.id) !== remove.dataset.deleteField,
+    );
+    save();
+    render();
+    toast("Custom field deleted");
+  }
 });
-render();
-
+async function boot() {
+  try {
+    let payload = await api("/api/auth/me");
+    session = payload.user;
+    await loadWorkspace();
+  } catch { session = null; }
+  render();
+}
+boot();

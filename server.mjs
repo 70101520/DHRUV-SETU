@@ -4,6 +4,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 import nodemailer from 'nodemailer';
+import { closeEnterpriseDatabase, databaseStatus, handleEnterprise, initializeEnterpriseDatabase } from './enterprise.mjs';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
 const port = Number(process.env.PORT || 8080);
@@ -101,12 +102,21 @@ const readAuditLogs = () => {
   return readFileSync(auditLogFile, 'utf8').split(/\r?\n/).filter(Boolean).slice(-500).reverse().map(line => JSON.parse(line));
 };
 
-const server = createServer((request, response) => {
+const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
 
   if (requestUrl.pathname === '/health') {
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-    response.end(JSON.stringify({ status: 'ok', service: 'dhruv-setu-crm' }));
+    response.end(JSON.stringify({ status: 'ok', service: 'dhruv-setu-crm', database: databaseStatus() }));
+    return;
+  }
+
+  try {
+    if (await handleEnterprise(request, response, requestUrl)) return;
+  } catch (error) {
+    console.error('API request failed', error);
+    response.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    response.end(JSON.stringify({ ok: false, error: 'The server could not complete this request.' }));
     return;
   }
 
@@ -283,10 +293,11 @@ const server = createServer((request, response) => {
   createReadStream(file).pipe(response);
 });
 
+await initializeEnterpriseDatabase();
 server.listen(port, host, () => {
   console.log(`Dhruv-Setu CRM is running at http://localhost:${port}`);
 });
 
-const shutdown = () => server.close(() => process.exit(0));
+const shutdown = () => server.close(async () => { await closeEnterpriseDatabase(); process.exit(0); });
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
